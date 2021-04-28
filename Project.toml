@@ -3,6 +3,9 @@ uuid = "97ed5823-4806-477e-8be3-be3e0d6ee308"
 authors = ["sl-solution <github.sl.solution@icloud.com> and contributors"]
 version = "0.1.0"
 
+[deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+
 [compat]
 julia = "1"
 
