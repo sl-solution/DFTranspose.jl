@@ -4,6 +4,15 @@ This is a temporary package to explore the implementation of reshaping `DataFram
 
 See https://github.com/JuliaData/DataFrames.jl/issues/2732#issue-865607582
 
+## Installation
+
+run the following code inside a `Julia` session.
+
+```julia
+using Pkg
+Pkg.add("https://github.com/sl-solution/DFTranspose.jl")
+```
+
 # Introduction
 
 The `DFTranspose.jl` package only exports one function, `df_transpose`, which can be used to reshape a `DataFrame`.
@@ -16,7 +25,7 @@ When an `id` variable is specified, `df_transpose` transpose the data as above, 
 
 When a set of groupby variables are specified, the `df_transpose` function repeats the simple transposing of data within each group constructed by groupby variables. Like the simplest case, and `id` variable can be used to label the columns of the output data frame.
 
-> Currently if an `id` variable is repeated within a group, `df_transpose` throw an error. However, this may change in the future.
+> Currently if an `id` variable is repeated within a group, `df_transpose` throw an error. However, this may change in future.
 
 ![Groupby Transposing](/images/groupby-transpose.svg)
 
@@ -238,7 +247,7 @@ julia> df_transpose(df2, [:b, :c, :d], id = :a, variable_name = "new_col")
 ## stack
 `df_transpose(df::AbstractDataFrame, cols, gcols)` can be used to emulate `stack` functionalities. Generally speaking, `stack` transposes each row of a data frame. Thus, to achieve the `stack` functionality each row of the input data frame should be an individual group. This can be done by inserting a new column to the input data frame or using `df_transpose` twice.
 
-Currently `df_transpose` doesn't support `view` keywork of the `stack` function, however, it may change in future.
+Currently `df_transpose` doesn't support `view` keyword (see help for `stack` function), however, it may change in future.
 
 ### Examples
 ```julia
@@ -298,7 +307,7 @@ julia> df_transpose(df, [:c, :d], [:RowID, :a])
 
 ## unstack
 
-`df_transpose(df::AbstractDataFrame, cols, gcols)` can be used to emulate `unstack` functionalities. However, unlike `unstack`, `df_transpose` can unstack multiple measure variables.
+`df_transpose(df::AbstractDataFrame, cols, gcols)` can be used to emulate `unstack` functionalities. Additionally, `df_transpose` can unstack multiple measure variables.
 
 ### Examples
 
