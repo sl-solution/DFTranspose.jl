@@ -1,6 +1,6 @@
 # DFTranspose.jl
 
-This is a temporary package to explore the implementation of reshaping `DataFrames` objects in `Julia` [JuliaData/DataFrames.jl#2732](https://github.com/JuliaData/DataFrames.jl/issues/2732#issue-865607582).
+This is a temporary package to explore the implementation of reshaping `DataFrames` objects in `Julia` (https://github.com/JuliaData/DataFrames.jl/issues/2732#issue-865607582).
 # permutedims
 
 `df_transpose(df::AbstractDataFrame, cols)` is similar to `permutedims()` with some flexibility.
