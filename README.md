@@ -1,14 +1,14 @@
-# DFTranspose
+# DFTranspose.jl
 
-"""
+This is a temporary package to explore the implementation of reshaping `DataFrames` objects in `Julia` (JuliaData/DataFrames.jl/issues/#2732).
 # permutedims
 
 `df_transpose(df::AbstractDataFrame, cols)` is similar to `permutedims()` with some flexibility.
 
 * `df_transpose` only permutes the columns `cols`.
-* If no variable is provided as `id`, it generates the column names of the new data set by maping a function (`colid`) on the sequence of rows in `df`.
+* If no variable is provided as `id`, it generates the column names of the new data set by mapping a function (`colid`) on the sequence of rows in `df`.
 * A function (`rowid`) applied to the row id in the output data frame before generating the `variable_name` columns.
-* If `id` is set from a column in `df`, it applies `colid` on the strigified values of `id` and uses the result as the column names for the new data frame.
+* If `id` is set from a column in `df`, it applies `colid` on the stringified values of `id` and uses the result as the column names for the new data frame.
 
 ## Examples
 
@@ -141,4 +141,3 @@ julia> df_transpose(df, [:c, :d], [:RowID, :a])
 # unstack
 
 `df_transpose(df::AbstractDataFrame, cols, gcols)` can be used to emulate `unstack` functionalities.
-"""
