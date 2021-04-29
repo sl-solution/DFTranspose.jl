@@ -52,6 +52,8 @@ transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be us
 
 * `colid`: When `id` is not set, the argument to `colid` must be an `Int`. And when `id` is set, the `colid` will be applied to stringified `df[!, id]`.
 """
+
+# FIXME currently there are some allocations which I cannot figure out why they happens
 function df_transpose(df::AbstractDataFrame, cols; id = nothing, colid = nothing, rowid = _default_rowid_function, variable_name = "_variables_")
     ECol = eachcol(df[!,cols])
     T = promote_type(eltype.(ECol)...)
@@ -164,6 +166,7 @@ end
 
 transposes `df[!, cols]` within each group constructed by `gcols`.
 """
+# FIXME currently there are some allocations which I cannot figure out why they happens
 function df_transpose(df::AbstractDataFrame, cols, gcols; id = nothing, colid = nothing, rowid = _default_rowid_function, variable_name = "_variables_")
     ECol = eachcol(df[!,cols])
     EColG = eachcol(df[!,gcols])
