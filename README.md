@@ -29,7 +29,6 @@ When a set of groupby variables are specified, the `df_transpose` function repea
 
 ![Groupby Transposing](/images/groupby-transpose.svg)
 
-
 ## Examples
 
 **Basic usage**
@@ -55,7 +54,6 @@ julia> df_transpose(df, [:x1,:x2])
 ```
 
 **Specifying ID variable**
-
 
 ```julia
 julia> df = DataFrame(id = ["r1", "r2", "r3" , "r4"], x1 = [1,2,3,4], x2 = [1,4,9,16])
@@ -130,7 +128,7 @@ julia> df_transpose(df, 2:4, [:group], id = :e)
 **Advanced usage**
 
 ```julia
-julia> df = DataFrame(country = ["c1","c1","c2","c2","c3","c3"],
+julia> pop = DataFrame(country = ["c1","c1","c2","c2","c3","c3"],
                         sex = ["male", "female", "male", "female", "male", "female"],
                         pop_2000 = [100, 120, 150, 155, 170, 190],
                         pop_2010 = [110, 120, 155, 160, 178, 200],
@@ -244,11 +242,13 @@ julia> df_transpose(df2, [:b, :c, :d], id = :a, variable_name = "new_col")
 ```
 
 ## stack
+
 `df_transpose(df::AbstractDataFrame, cols, gcols)` can be used to emulate `stack` functionalities. Generally speaking, `stack` transposes each row of a data frame. Thus, to achieve the `stack` functionality each row of the input data frame should be an individual group. This can be done by inserting a new column to the input data frame or using `df_transpose` twice.
 
 Currently `df_transpose` doesn't support `view` keyword (see help for `stack` function), however, this may change in future.
 
 ### Examples
+
 ```julia
 julia> df = DataFrame(a = repeat(1:3, inner = 2),
                              b = repeat(1:2, inner = 3),
