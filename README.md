@@ -10,7 +10,7 @@ run the following code inside a `Julia` session.
 
 ```julia
 using Pkg
-Pkg.add("https://github.com/sl-solution/DFTranspose.jl")
+Pkg.add(url = "https://github.com/sl-solution/DFTranspose.jl")
 ```
 
 # Introduction
