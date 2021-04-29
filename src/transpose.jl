@@ -22,11 +22,11 @@ function _simple_generate_names_withoutid(renamecolid, renamerowid, size1, dfnam
 end
 function _simple_generate_names_withid(renamecolid, renamerowid, ids, dfnames)
 
-    if eltype(ids) <: Union{Missing, Number, Symbol, AbstractString, CategoricalArray}
+    # if eltype(ids) <: Union{Missing, Number, Symbol, AbstractString, CategoricalArray}
         new_col_names = map(renamecolid, string.(ids))
-    else
-        throw(ArgumentError("The type of `id` variable should be Number, Symbol, or String."))
-    end
+    # else
+    #     throw(ArgumentError("The type of `id` variable should be Number, Symbol, or String."))
+    # end
 
     row_names = map(renamerowid, dfnames)
     (new_col_names, row_names)
