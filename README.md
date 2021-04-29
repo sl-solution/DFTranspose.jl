@@ -127,7 +127,7 @@ julia> df_transpose(df, 2:4, [:group], id = :e)
    9 │     3  d            missing  missing  missing  missing        5        6
 ```
 
-**Advance usage**
+**Advanced usage**
 
 ```julia
 julia> df = DataFrame(country = ["c1","c1","c2","c2","c3","c3"],
