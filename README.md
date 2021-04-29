@@ -1,6 +1,6 @@
 # DFTranspose.jl
 
-This is a temporary package to explore the implementation of reshaping `DataFrames` objects in `Julia`.
+This is a temporary package to explore the implementation of a new function for reshaping `DataFrames` objects in `Julia`.
 
 See https://github.com/JuliaData/DataFrames.jl/issues/2732#issue-865607582
 
@@ -21,7 +21,7 @@ In its simplest form `df_transpose` transposes the specified columns of a `DataF
 
 ![Simple Transposing](/images/simple-transpose.svg)
 
-When an `id` variable is specified, `df_transpose` transpose the data as above, however, use the values of the `id` variable to label the columns of the output data frame. `colid` can be used to modify the labels on fly.
+When an `id` variable is specified, `df_transpose` transpose the data as above, however, use the values of the `id` variable to label the columns of the output data frame. `renamecolid` can be used to modify the labels on fly.
 
 When a set of groupby variables are specified, the `df_transpose` function repeats the simple transposing of data within each group constructed by groupby variables. Like the simplest case, and `id` variable can be used to label the columns of the output data frame.
 
@@ -147,7 +147,7 @@ julia> df = DataFrame(country = ["c1","c1","c2","c2","c3","c3"],
    6 │ c3       female       190       200       203
 
 julia> df_transpose(pop, r"pop_", [:country], id = :sex, variable_name = "year",
-                rowid = x -> match(r"[0-9]+",x).match, colid = x -> x * "_pop")
+                renamerowid = x -> match(r"[0-9]+",x).match, renamecolid = x -> x * "_pop")
  9×4 DataFrame
   Row │ country  year       male_pop  female_pop
       │ String   SubStrin…  Int64?    Int64?     
@@ -170,9 +170,8 @@ julia> df_transpose(pop, r"pop_", [:country], id = :sex, variable_name = "year",
 `df_transpose(df::AbstractDataFrame, cols)` is similar to `permutedims()` with some differences.
 
 * `df_transpose` only permutes the columns `cols`.
-* If no variable is provided as `id`, it generates the column names of the new data set by mapping a function (`colid`) on the sequence of rows in `df`.
-* A function (`rowid`) applied to the row id in the output data frame before generating the `variable_name` columns.
-* If `id` is set from a column in `df`, it applies `colid` on the stringified values of `id` and uses the result as the column names for the new data frame.
+* If no variable is provided as `id`, it generates the column names of the new data set by mapping a function (`renamecolid`) on the sequence of rows in `df`.
+* A function (`renamerowid`) applied to the rows id in the output data frame before generating the `variable_name` columns.
 
 ### Examples
 
@@ -197,8 +196,8 @@ julia> df_transpose(df, r"x")
    2 │ x2               8      1      6      2      3
    3 │ x3               6      5      3     10      8
 
-julia> df_transpose(df, r"x", rowid = x -> match(r"[0-9]+",x).match,
-                     colid = x -> "_column_" * string(x))
+julia> df_transpose(df, r"x", renamerowid = x -> match(r"[0-9]+",x).match,
+                     renamecolid = x -> "_column_" * string(x))
 3×6 DataFrame
  Row │ _variables_  _column_1  _column_2  _column_3  _column_4  _column_5
      │ SubString…   Int64      Int64      Int64      Int64      Int64
@@ -247,7 +246,7 @@ julia> df_transpose(df2, [:b, :c, :d], id = :a, variable_name = "new_col")
 ## stack
 `df_transpose(df::AbstractDataFrame, cols, gcols)` can be used to emulate `stack` functionalities. Generally speaking, `stack` transposes each row of a data frame. Thus, to achieve the `stack` functionality each row of the input data frame should be an individual group. This can be done by inserting a new column to the input data frame or using `df_transpose` twice.
 
-Currently `df_transpose` doesn't support `view` keyword (see help for `stack` function), however, it may change in future.
+Currently `df_transpose` doesn't support `view` keyword (see help for `stack` function), however, this may change in future.
 
 ### Examples
 ```julia
@@ -267,7 +266,7 @@ julia> df = DataFrame(a = repeat(1:3, inner = 2),
    5 │     3      2      1      5  e
    6 │     3      2      1      6  f
 
-julia> df_transpose(df, [:c, :d], Not([:c, :d]), variable_name = "variable", colid = x -> "value")
+julia> df_transpose(df, [:c, :d], Not([:c, :d]), variable_name = "variable", renamecolid = x -> "value")
 12×5 DataFrame
  Row │ a      b      e       variable  value
      │ Int64  Int64  String  String    Int64?
@@ -331,7 +330,7 @@ wide = DataFrame(id = 1:6,
 # stacking to make data long
 julia> long = df_transpose(wide, 3:5, [:id, :a],
                            variable_name = "variable",
-                           colid = x->"value")
+                           renamecolid = x->"value")
 18×4 DataFrame
  Row │ id     a      variable  value    
      │ Int64  Int64  String    Float64?

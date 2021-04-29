@@ -2,9 +2,9 @@
 #  If type is not concrete, probably something is wrong about setting the variables and it is better to be conservative
 _check_allocation_limit(T, rows, cols) = isconcretetype(T) ? sizeof(T)*rows*cols / Base.Sys.total_memory() : rows*cols/10^6
 
-_default_colid_function_withoutid(x) = "_c" * string(x)
-_default_colid_function_withid(x) = identity(x)
-_default_rowid_function(x) = identity(x)
+_default_renamecolid_function_withoutid(x) = "_c" * string(x)
+_default_renamecolid_function_withid(x) = identity(x)
+_default_renamerowid_function(x) = identity(x)
 # handling simplest case
 function _simple_df_transpose!(outx, inx)
     for j in 1:size(outx,2)
@@ -14,21 +14,21 @@ function _simple_df_transpose!(outx, inx)
     end
 end
 
-function _simple_generate_names_withoutid(colid, rowid, size1, dfnames)
-    new_col_names = map(colid, 1:size1)
+function _simple_generate_names_withoutid(renamecolid, renamerowid, size1, dfnames)
+    new_col_names = map(renamecolid, 1:size1)
 
-    row_names = map(rowid, dfnames)
+    row_names = map(renamerowid, dfnames)
     (new_col_names, row_names)
 end
-function _simple_generate_names_withid(colid, rowid, ids, dfnames)
+function _simple_generate_names_withid(renamecolid, renamerowid, ids, dfnames)
 
-    if eltype(ids) <: Union{Number, Symbol, AbstractString}
-        new_col_names = map(colid, string.(ids))
+    if eltype(ids) <: Union{Missing, Number, Symbol, AbstractString, CategoricalArray}
+        new_col_names = map(renamecolid, string.(ids))
     else
         throw(ArgumentError("The type of `id` variable should be Number, Symbol, or String."))
     end
 
-    row_names = map(rowid, dfnames)
+    row_names = map(renamerowid, dfnames)
     (new_col_names, row_names)
 end
 
@@ -44,32 +44,31 @@ end
 """
     df_transpose(df::AbstractDataFrame, cols;
         id = nothing,
-        colid = (x -> "_c" * string(x)),
-        rowid = identity,
+        renamecolid = (x -> "_c" * string(x)),
+        renamerowid = identity,
         variable_name = "_variables_")
 
-transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `colid` function to generate the new columns labels. The `rowid` function is applied to stringified names of `df[!, cols]` and attached them to the output as a new column with the label `variable_name`.
+transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `renamecolid` function to generate the new columns labels. The `renamerowid` function is applied to stringified names of `df[!, cols]` and attached them to the output as a new column with the label `variable_name`.
 
-* `colid`: When `id` is not set, the argument to `colid` must be an `Int`. And when `id` is set, the `colid` will be applied to stringified `df[!, id]`.
+* `renamecolid`: When `id` is not set, the argument to `renamecolid` must be an `Int`. And when `id` is set, the `renamecolid` will be applied to stringified `df[!, id]`.
 """
 
-# FIXME currently there are some allocations which I cannot figure out why they happens
-function df_transpose(df::AbstractDataFrame, cols; id = nothing, colid = nothing, rowid = _default_rowid_function, variable_name = "_variables_")
+function df_transpose(df::AbstractDataFrame, cols; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_")
     ECol = eachcol(df[!,cols])
     T = promote_type(eltype.(ECol)...)
     in_cols = Vector{T}[x for x in ECol]
 
     if id === nothing
-        if colid === nothing
-            colid = _default_colid_function_withoutid
+        if renamecolid === nothing
+            renamecolid = _default_renamecolid_function_withoutid
         end
-        new_col_names, row_names = _simple_generate_names_withoutid(colid, rowid, nrow(df), names(ECol))
+        new_col_names, row_names = _simple_generate_names_withoutid(renamecolid, renamerowid, nrow(df), names(ECol))
     else
-        if colid === nothing
-            colid = _default_colid_function_withid
+        if renamecolid === nothing
+            renamecolid = _default_renamecolid_function_withid
         end
         @assert length(unique(df[!, id])) == nrow(df) "Duplicate ids are not allowed."
-        new_col_names, row_names = _simple_generate_names_withid(colid, rowid, df[!,id], names(ECol))
+        new_col_names, row_names = _simple_generate_names_withid(renamecolid, renamerowid, df[!,id], names(ECol))
     end
 
     _simple_transpose_df_generate(T, in_cols, row_names, new_col_names, variable_name)
@@ -102,7 +101,7 @@ function update_outputmat!(outputmat, x, gridx, which_col, row_names, i)
     end
 end
 
-function update_outputmat!(outputmat, x, gridx, ids::Vector, dict_cols::Dict, row_names, i, row_t)
+function update_outputmat!(outputmat, x, gridx, ids, dict_cols::Dict, row_names, i, row_t)
     n_row_names = length(row_names)
     gid = gridx[i]
     selected_col = dict_cols[ids[i]]
@@ -160,14 +159,14 @@ end
 """
     df_transpose(df::AbstractDataFrame, cols, gcols;
         id = nothing,
-        colid = (x -> "_c" * string(x)),
-        rowid = identity,
+        renamecolid = (x -> "_c" * string(x)),
+        renamerowid = identity,
         variable_name = "_variables_")
 
 transposes `df[!, cols]` within each group constructed by `gcols`.
 """
-# FIXME currently there are some allocations which I cannot figure out why they happens
-function df_transpose(df::AbstractDataFrame, cols, gcols; id = nothing, colid = nothing, rowid = _default_rowid_function, variable_name = "_variables_")
+
+function df_transpose(df::AbstractDataFrame, cols, gcols; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_")
     ECol = eachcol(df[!,cols])
     EColG = eachcol(df[!,gcols])
     T = promote_type(eltype.(ECol)...)
@@ -180,24 +179,24 @@ function df_transpose(df::AbstractDataFrame, cols, gcols; id = nothing, colid = 
 
 
     if id === nothing
-        if colid === nothing
-            colid = _default_colid_function_withoutid
+        if renamecolid === nothing
+            renamecolid = _default_renamecolid_function_withoutid
         end
 
         out_ncol = _obtain_maximum_groups_levels(gridx, gdf.ngroups)
 
-        new_col_names, row_names = _simple_generate_names_withoutid(colid, rowid, out_ncol, names(ECol))
+        new_col_names, row_names = _simple_generate_names_withoutid(renamecolid, renamerowid, out_ncol, names(ECol))
 
         (group_info, outputmat) = _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t)
     else
-        if colid === nothing
-            colid = _default_colid_function_withid
+        if renamecolid === nothing
+            renamecolid = _default_renamecolid_function_withid
         end
 
         unique_ids = unique(df[!,id])
         out_ncol = length(unique_ids)
 
-        new_col_names, row_names = _simple_generate_names_withid(colid, rowid, unique_ids, names(ECol))
+        new_col_names, row_names = _simple_generate_names_withid(renamecolid, renamerowid, unique_ids, names(ECol))
 
         dict_out_col = Dict(unique_ids .=> 1:out_ncol)
 
