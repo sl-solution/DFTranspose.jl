@@ -2,7 +2,15 @@
 
 This is a temporary package to explore the implementation of reshaping `DataFrames` objects in `Julia`.
 
-https://github.com/JuliaData/DataFrames.jl/issues/2732#issue-865607582
+See https://github.com/JuliaData/DataFrames.jl/issues/2732#issue-865607582
+
+# Introduction
+
+`DFTranspose.jl` only exports one function, `df_transpose`, which can be used to reshape a `DataFrame`.
+
+In its simplest form `df_transpose` transposes the specified columns of a `DataFrame`.
+
+![Simple Transposing](/images/simple-transpose.svg)
 
 # permutedims
 
