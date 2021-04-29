@@ -6,11 +6,65 @@ See https://github.com/JuliaData/DataFrames.jl/issues/2732#issue-865607582
 
 # Introduction
 
-`DFTranspose.jl` only exports one function, `df_transpose`, which can be used to reshape a `DataFrame`.
+The `DFTranspose.jl` package only exports one function, `df_transpose`, which can be used to reshape a `DataFrame`.
 
-In its simplest form `df_transpose` transposes the specified columns of a `DataFrame`.
+In its simplest form `df_transpose` transposes the specified columns of a `DataFrame`, and attaches a new column to the output data frame to track the original names of the transposed variables. The label of this column can be controlled by `variable_name` keyword.
 
 ![Simple Transposing](/images/simple-transpose.svg)
+
+When an `id` variable is specified, `df_transpose` transpose the data as above, however, use the values of the `id` variable to label the columns of the output data frame. `colid` can be used to modify the labels on fly.
+
+When a set of groupby variables are specified, the `df_transpose` function repeats the simple transposing of data within each group constructed by groupby variables.
+
+![Groupby Transposing](/images/groupby-transpose.svg)
+
+
+## Examples
+
+**Basic usage**
+
+```julia
+julia> df = DataFrame(x1 = [1,2,3,4], x2 = [1,4,9,16])
+ 4×2 DataFrame
+ Row │ x1     x2    
+     │ Int64  Int64
+─────┼──────────────
+   1 │     1      1
+   2 │     2      4
+   3 │     3      9
+   4 │     4     16
+
+julia> df_transpose(df, [:x1,:x2])
+2×5 DataFrame
+ Row │ _variables_  _c1    _c2    _c3    _c4   
+     │ String       Int64  Int64  Int64  Int64
+─────┼─────────────────────────────────────────
+   1 │ x1               1      2      3      4
+   2 │ x2               1      4      9     16
+```
+
+**Specifying ID variable**
+
+
+```julia
+julia> df = DataFrame(id = ["r1", "r2", "r3" , "r4"], x1 = [1,2,3,4], x2 = [1,4,9,16])
+4×3 DataFrame
+ Row │ id      x1     x2    
+     │ String  Int64  Int64
+─────┼──────────────────────
+   1 │ r1          1      1
+   2 │ r2          2      4
+   3 │ r3          3      9
+   4 │ r4          4     16
+
+julia> df_transpose(df, [:x1,:x2], id = :id)
+2×5 DataFrame
+ Row │ _variables_  r1     r2     r3     r4    
+     │ String       Int64  Int64  Int64  Int64
+─────┼─────────────────────────────────────────
+   1 │ x1               1      2      3      4
+   2 │ x2               1      4      9     16
+```
 
 # permutedims
 
@@ -44,7 +98,8 @@ julia> df_transpose(df, r"x")
    2 │ x2               8      1      6      2      3
    3 │ x3               6      5      3     10      8
 
-julia> df_transpose(df, r"x", rowid = x -> match(r"[0-9]+",x).match, colid = x -> "_column_" * string(x))
+julia> df_transpose(df, r"x", rowid = x -> match(r"[0-9]+",x).match,
+                     colid = x -> "_column_" * string(x))
 3×6 DataFrame
  Row │ _variables_  _column_1  _column_2  _column_3  _column_4  _column_5
      │ SubString…   Int64      Int64      Int64      Int64      Int64

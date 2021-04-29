@@ -1,5 +1,6 @@
 # a helper function that checks if there is enough memory for the output data frame
-_check_allocation_limit(T, rows, cols) = isconcretetype(T) ? sizeof(T)*rows*cols / Base.Sys.total_memory() : rows*cols/typemax(Int32)
+#  If type is not concrete, probably something is wrong about setting the variables and it is better to be conservative
+_check_allocation_limit(T, rows, cols) = isconcretetype(T) ? sizeof(T)*rows*cols / Base.Sys.total_memory() : rows*cols/10^6
 
 _default_colid_function_withoutid(x) = "_c" * string(x)
 _default_colid_function_withid(x) = identity(x)
