@@ -1,6 +1,6 @@
 # a helper function that checks if there is enough memory for the output data frame
-#  If type is not concrete, probably something is wrong about setting the variables and it is better to be conservative
-_check_allocation_limit(T, rows, cols) = isconcretetype(T) ? sizeof(T)*rows*cols / Base.Sys.total_memory() : rows*cols/10^6
+#  If type is not Number, probably something is wrong about setting the variables and it is better to be conservative. here 10^6 threshhold is arbitarary
+_check_allocation_limit(T, rows, cols) = isconcretetype(T) && T <: Number ? sizeof(T)*rows*cols / Base.Sys.total_memory() : rows*cols/10^6
 
 _default_renamecolid_function_withoutid(x) = "_c" * string(x)
 _default_renamecolid_function_withid(x) = identity(x)
@@ -8,8 +8,8 @@ _default_renamerowid_function(x) = identity(x)
 # handling simplest case
 function _simple_df_transpose!(outx, inx)
     for j in 1:size(outx,2)
-        @simd for i in 1:size(outx,1)
-            @inbounds outx[i,j] = inx[i][j]
+        for i in 1:size(outx,1)
+            outx[i,j] = inx[i][j]
         end
     end
 end
@@ -53,9 +53,9 @@ transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be us
 * `renamecolid`: When `id` is not set, the argument to `renamecolid` must be an `Int`. And when `id` is set, the `renamecolid` will be applied to stringified `df[!, id]`.
 """
 
-function df_transpose(df::AbstractDataFrame, cols; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_")
+function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_")
     ECol = eachcol(df[!,cols])
-    T = promote_type(eltype.(ECol)...)
+    T = mapreduce(eltype, promote_type, ECol)
     in_cols = Vector{T}[x for x in ECol]
 
     if id === nothing
@@ -106,7 +106,7 @@ function update_outputmat!(outputmat, x, gridx, ids, dict_cols::Dict, row_names,
     gid = gridx[i]
     selected_col = dict_cols[ids[i]]
     if !ismissing(outputmat[(gid-1)*n_row_names+1, selected_col])
-        throw(ErrorException("Duplicate id for $(ids[i]) in group $(row_t[gid])"))
+        throw(AssertionError("Duplicate id for $(ids[i]) in group $(row_t[gid])"))
     end
     for j in 1:n_row_names
         outputmat[(gid-1)*n_row_names+j, selected_col] = x[j][i]
@@ -115,7 +115,7 @@ end
 
 function _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t)
 
-    @assert _check_allocation_limit(T, length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
+    @assert _check_allocation_limit(nonmissingtype(T), length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
 
     outputmat = fill!(Matrix{Union{T, Missing}}(undef,length(row_names)*gdf.ngroups, length(new_col_names)),missing)
 
@@ -136,7 +136,7 @@ end
 
 function _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids, new_col_names, row_names, dict_cols, row_t)
 
-    @assert _check_allocation_limit(T, length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
+    @assert _check_allocation_limit(nonmissingtype(T), length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
 
     outputmat = fill!(Matrix{Union{T, Missing}}(undef,length(row_names)*gdf.ngroups, length(new_col_names)),missing)
 
@@ -166,10 +166,10 @@ end
 transposes `df[!, cols]` within each group constructed by `gcols`.
 """
 
-function df_transpose(df::AbstractDataFrame, cols, gcols; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_")
+function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, gcols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_")
     ECol = eachcol(df[!,cols])
     EColG = eachcol(df[!,gcols])
-    T = promote_type(eltype.(ECol)...)
+    T = mapreduce(eltype, promote_type, ECol)
     row_t = Tables.rowtable(EColG)
 
     in_cols = Vector{T}[x for x in ECol]
@@ -209,3 +209,12 @@ function df_transpose(df::AbstractDataFrame, cols, gcols; id = nothing, renameco
 
     DataFrames.hcat!(DataFrame(group_info),df1)
 end
+
+
+df_transpose(df::AbstractDataFrame, cols::DataFrames.ColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_") = df_transpose(df,[cols]; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name)
+
+df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, gcols::DataFrames.ColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_") = df_transpose(df,cols, [gcols]; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name)
+
+df_transpose(df::AbstractDataFrame, cols::DataFrames.ColumnIndex, gcols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_") = df_transpose(df, [cols], gcols; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name)
+
+df_transpose(df::AbstractDataFrame, cols::DataFrames.ColumnIndex, gcols::DataFrames.ColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_") = df_transpose(df, [cols], [gcols]; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name)

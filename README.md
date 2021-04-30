@@ -9,8 +9,8 @@ See https://github.com/JuliaData/DataFrames.jl/issues/2732#issue-865607582
 run the following code inside a `Julia` session.
 
 ```julia
-using Pkg
-Pkg.add(url = "https://github.com/sl-solution/DFTranspose.jl")
+julia> using Pkg
+julia> Pkg.add(url = "https://github.com/sl-solution/DFTranspose.jl")
 ```
 
 # Introduction
@@ -25,7 +25,8 @@ When an `id` variable is specified, `df_transpose` transpose the data as above, 
 
 When a set of groupby variables are specified, the `df_transpose` function repeats the simple transposing of data within each group constructed by groupby variables. Like the simplest case, and `id` variable can be used to label the columns of the output data frame.
 
-> Currently if an `id` variable is repeated within a group, `df_transpose` throw an error. However, this may change in future.
+> Currently if an `id` value is repeated within a group, `df_transpose` throw an error. However, this may change in future.
+> Missing values can be a group level or a value for the `id` variable. They will be treated as a category.
 
 ![Groupby Transposing](/images/groupby-transpose.svg)
 
@@ -109,7 +110,7 @@ julia> df_transpose(df, 2:4, [:group])
    8 │     3  c                 1       1
    9 │     3  d                 5       6
 
-julia> df_transpose(df, 2:4, [:group], id = :e)
+julia> df_transpose(df, 2:4, :group, id = :e)
 9×8 DataFrame
  Row │ group  _variables_  a        b        c        d        e        f       
      │ Int64  String       Int64?   Int64?   Int64?   Int64?   Int64?   Int64?  
@@ -144,7 +145,7 @@ julia> pop = DataFrame(country = ["c1","c1","c2","c2","c3","c3"],
    5 │ c3       male         170       178       180
    6 │ c3       female       190       200       203
 
-julia> df_transpose(pop, r"pop_", [:country], id = :sex, variable_name = "year",
+julia> df_transpose(pop, r"pop_", :country, id = :sex, variable_name = "year",
                 renamerowid = x -> match(r"[0-9]+",x).match, renamecolid = x -> x * "_pop")
  9×4 DataFrame
   Row │ country  year       male_pop  female_pop
@@ -159,6 +160,35 @@ julia> df_transpose(pop, r"pop_", [:country], id = :sex, variable_name = "year",
     7 │ c3       2000            170         190
     8 │ c3       2010            178         200
     9 │ c3       2020            180         203
+
+julia> using Dates
+julia> df = DataFrame([[1, 2, 3], [1.1, 2.0, 3.3],[1.1, 2.1, 3.0],[1.1, 2.0, 3.2]]
+                    ,[:person, Symbol("11/2020"), Symbol("12/2020"), Symbol("1/2021")])
+3×4 DataFrame
+Row │ person   11/2020  12/2020  1/2021  
+    │ Float64  Float64  Float64  Float64
+─────┼────────────────────────────────────
+  1 │     1.0      1.1      1.1      1.1
+  2 │     2.0      2.0      2.1      2.0
+  3 │     3.0      3.3      3.0      3.2
+
+julia> df_transpose(df, Not(:person), :person,
+                           variable_name = "Date",
+                           renamerowid = x -> Date(x, dateformat"m/y"),
+                           renamecolid = x -> "measurement")
+   9×3 DataFrame
+ Row │ person   Date        measurement
+     │ Float64  Date        Float64?    
+─────┼──────────────────────────────────
+   1 │     1.0  2020-11-01          1.1
+   2 │     1.0  2020-12-01          1.1
+   3 │     1.0  2021-01-01          1.1
+   4 │     2.0  2020-11-01          2.0
+   5 │     2.0  2020-12-01          2.1
+   6 │     2.0  2021-01-01          2.0
+   7 │     3.0  2020-11-01          3.3
+   8 │     3.0  2020-12-01          3.0
+   9 │     3.0  2021-01-01          3.2            
 ```
 
 # Relation to other functions
