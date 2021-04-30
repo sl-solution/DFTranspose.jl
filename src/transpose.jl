@@ -155,6 +155,15 @@ function _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids, new_
     (group_info, outputmat)
 end
 
+# if want a faster way in the case of stack
+function _fill_outputmat_and_group_info_fast_stack(in_cols, row_t)
+
+    outputmat = vcat(in_cols...)
+
+    group_info = repeat(row_t, outer = length(in_cols))
+
+    (group_info, outputmat)
+end
 
 """
     df_transpose(df::AbstractDataFrame, cols, gcols;
@@ -177,6 +186,14 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
     gdf = groupby(df, gcols)
     gridx = gdf.groups
 
+    fast_stack = false
+    if gdf.ngroups == nrow(df)
+        # we are doing a stack
+        if nonmissingtype(T) <: Number
+            # we can use fast approach
+            fast_stack = true
+        end
+    end
 
     if id === nothing
         if renamecolid === nothing
@@ -187,7 +204,7 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
 
         new_col_names, row_names = _simple_generate_names_withoutid(renamecolid, renamerowid, out_ncol, names(ECol))
 
-        (group_info, outputmat) = _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t)
+        group_info, outputmat = _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t)
     else
         if renamecolid === nothing
             renamecolid = _default_renamecolid_function_withid
@@ -199,15 +216,14 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
         new_col_names, row_names = _simple_generate_names_withid(renamecolid, renamerowid, unique_ids, names(ECol))
 
         dict_out_col = Dict(unique_ids .=> 1:out_ncol)
-
-        (group_info, outputmat) = _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, df[!, id], new_col_names, row_names, dict_out_col, row_t)
+        group_info, outputmat = _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, df[!, id], new_col_names, row_names, dict_out_col, row_t)
     end
 
     new_var_label = Symbol(variable_name)
 
     df1 = insertcols!(DataFrame(outputmat, new_col_names),1, new_var_label => repeat(row_names, outer = gdf.ngroups))
-
     DataFrames.hcat!(DataFrame(group_info),df1)
+    
 end
 
 
