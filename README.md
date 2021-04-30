@@ -1,6 +1,6 @@
 # DFTranspose.jl
 
-This is a temporary package to explore the implementation of a new function for reshaping `DataFrames` objects in `Julia`.
+DFTranspose is a `Julia` package to explore the implementation of a new function for reshaping `DataFrame`s.
 
 See https://github.com/JuliaData/DataFrames.jl/issues/2732#issue-865607582
 
@@ -21,12 +21,13 @@ In its simplest form `df_transpose` transposes the specified columns of a `DataF
 
 ![Simple Transposing](/images/simple-transpose.svg)
 
-When an `id` variable is specified, `df_transpose` transpose the data as above, however, use the values of the `id` variable to label the columns of the output data frame. `renamecolid` can be used to modify the labels on fly. When there are multiple `id` variables are used, the default `renamecolid` function assigns each label by a Tuple of the values of those variables (see examples).
+When an `id` variable is specified, `df_transpose` transpose the data as above, however, it uses the values of the `id` variable to label the columns of the output data frame. `renamecolid` can be used to modify these labels on fly. When there are multiple `id` variables, the default `renamecolid` function assigns each label by a Tuple of the values of those variables (see examples).
 
 When a set of groupby variables are specified, the `df_transpose` function repeats the simple transposing of data within each group constructed by groupby variables. Like the simplest case, and `id` variable can be used to label the columns of the output data frame.
 
+**The following behaviours may change in future**
 > * The order of the output data frame is based on the order of observations in the input data frame.
-> * Currently if `id` value(s) is repeated within a group, `df_transpose` throw an error. However, this may change in future.
+> * Currently if `id` value(s) is repeated within a group, `df_transpose` throw an error.
 > * Missing values can be a group level or a value for the `id` variable. They will be treated as a category.
 
 ![Groupby Transposing](/images/groupby-transpose.svg)
@@ -206,32 +207,6 @@ julia> df_transpose(df, Not(:person), :person,
    8 │     3.0  2020-12-01          3.0
    9 │     3.0  2021-01-01          3.2          
 
-  # emulating the pivoting in python pandas
-julia> df = DataFrame(paddockId= [0, 0, 1, 1, 2, 2],
-                        color= ["red", "blue", "red", "blue", "red", "blue"],
-                        count= [3, 4, 3, 4, 3, 4],
-                        weight= [0.2, 0.3, 0.2, 0.3, 0.2, 0.2])
-6×4 DataFrame
- Row │ paddockId  color   count  weight  
-     │ Int64      String  Int64  Float64
-─────┼───────────────────────────────────
-   1 │         0  red         3      0.2
-   2 │         0  blue        4      0.3
-   3 │         1  red         3      0.2
-   4 │         1  blue        4      0.3
-   5 │         2  red         3      0.2
-   6 │         2  blue        4      0.2
-
-julia> df_transpose( df_transpose(df, [:count,:weight], [:paddockId,:color]),
-                     :_c1, :paddockId, id = 2:3)
-3×6 DataFrame
- Row │ paddockId  _variables_  ("red", "count")  ("red", "weight")  ("blue", "count")  ("blue", "weight")
-     │ Int64      String       Float64?          Float64?           Float64?           Float64?           
-─────┼────────────────────────────────────────────────────────────────────────────────────────────────────
-   1 │         0  _c1                       3.0                0.2                4.0                 0.3
-   2 │         1  _c1                       3.0                0.2                4.0                 0.3
-   3 │         2  _c1                       3.0                0.2                4.0                 0.2
-
 julia> df = DataFrame(region = repeat(["North","North","South","South"],2),
              fuel_type = repeat(["gas","coal"],4),
              load = rand(8),
@@ -270,9 +245,9 @@ julia> df = DataFrame(A_2018=1:4, A_2019=5:8, B_2017=9:12,
     3 │      3       7      11      11       14      3
     4 │      4       8      12      12       15      4
 
-julia> renamerowid(x) =  match(r"[0-9]+",x).match
-julia> dfA = df_transpose(df, r"A", :ID, renamerowid = renamerowid, variable_name = "Year", renamecolid = x->"A");
-julia> dfB = df_transpose(df, r"B", :ID, renamerowid = renamerowid, variable_name = "Year", renamecolid = x->"B");
+julia> f(x) =  match(r"[0-9]+",x).match
+julia> dfA = df_transpose(df, r"A", :ID, renamerowid = f, variable_name = "Year", renamecolid = x->"A");
+julia> dfB = df_transpose(df, r"B", :ID, renamerowid = f, variable_name = "Year", renamecolid = x->"B");
 julia> outerjoin(dfA, dfB, on = [:ID, :Year])
 12×4 DataFrame
  Row │ ID     Year       A        B       
@@ -290,6 +265,34 @@ julia> outerjoin(dfA, dfB, on = [:ID, :Year])
   10 │     2  2017       missing       10
   11 │     3  2017       missing       11
   12 │     4  2017       missing       12
+
+# emulating the pivoting in python pandas
+julia> df = DataFrame(paddockId= [0, 0, 1, 1, 2, 2],
+                        color= ["red", "blue", "red", "blue", "red", "blue"],
+                        count= [3, 4, 3, 4, 3, 4],
+                        weight= [0.2, 0.3, 0.2, 0.3, 0.2, 0.2])
+6×4 DataFrame
+ Row │ paddockId  color   count  weight  
+     │ Int64      String  Int64  Float64
+ ─────┼───────────────────────────────────
+   1 │         0  red         3      0.2
+   2 │         0  blue        4      0.3
+   3 │         1  red         3      0.2
+   4 │         1  blue        4      0.3
+   5 │         2  red         3      0.2
+   6 │         2  blue        4      0.2
+
+julia> df_transpose( df_transpose(df, [:count,:weight], [:paddockId,:color]),
+                     :_c1, :paddockId, id = 2:3)
+3×6 DataFrame
+ Row │ paddockId  _variables_  ("red", "count")  ("red", "weight")  ("blue", "count")  ("blue", "weight")
+     │ Int64      String       Float64?          Float64?           Float64?           Float64?           
+─────┼────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │         0  _c1                       3.0                0.2                4.0                 0.3
+   2 │         1  _c1                       3.0                0.2                4.0                 0.3
+   3 │         2  _c1                       3.0                0.2                4.0                 0.2
+
+
 ```
 
 # Relation to other functions
