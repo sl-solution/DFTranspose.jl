@@ -18,7 +18,7 @@ julia> Pkg.add(url = "https://github.com/sl-solution/DFTranspose.jl")
 The `DFTranspose.jl` package only exports one function, `df_transpose`, which can be used to reshape a `DataFrame`.
 
 ```
-   df_transpose(df, cols, [groupbycols]; kwargs...)
+   df_transpose(df, cols [, groupbycols]; kwargs...)
 ```
 
 In its simplest form `df_transpose` transposes the specified columns of a `DataFrame`, and attaches a new column to the output data frame to track the original names of the transposed variables. The label of this column can be controlled by `variable_name` keyword.
