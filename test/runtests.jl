@@ -76,6 +76,16 @@ const ≅ = isequal
                 Date = Date.(repeat(["2020-11-01","2020-12-01","2021-01-01"], 2)),
                 measurement = [1.1, 1.1, 1.1, 2.0, 2.1, 2.0])
     @test dft == dftm
+
+
+    df = DataFrame(rand(100,5),:auto)
+    insertcols!(df, 1, :id => repeat(1:20, 5))
+    insertcols!(df, 1, :g => repeat(1:5, inner = 20))
+
+    dft = df_transpose(df, r"x", [:g, :id], variable_name = "variable", renamecolid = x -> "value")
+    dfs = sort(stack(df, r"x"), [:g, :id])
+
+    @test dft == dfs
 end
 
 
