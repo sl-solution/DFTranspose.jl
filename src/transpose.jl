@@ -3,7 +3,7 @@
 _check_allocation_limit(T, rows, cols) = isconcretetype(T) && T <: Number ? sizeof(T)*rows*cols / Base.Sys.total_memory() : rows*cols/10^6
 
 _default_renamecolid_function_withoutid(x) = "_c" * string(x)
-_default_renamecolid_function_withid(x) = identity(x)
+_default_renamecolid_function_withid(x) = identity(string(values(x)))
 _default_renamerowid_function(x) = identity(x)
 # handling simplest case
 function _simple_df_transpose!(outx, inx)
@@ -23,7 +23,7 @@ end
 function _simple_generate_names_withid(renamecolid, renamerowid, ids, dfnames)
 
     # if eltype(ids) <: Union{Missing, Number, Symbol, AbstractString, CategoricalArray}
-        new_col_names = map(renamecolid, string.(ids))
+        new_col_names = map(renamecolid, ids)
     # else
     #     throw(ArgumentError("The type of `id` variable should be Number, Symbol, or String."))
     # end
@@ -50,7 +50,8 @@ end
 
 transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `renamecolid` function to generate the new columns labels. The `renamerowid` function is applied to stringified names of `df[!, cols]` and attached them to the output as a new column with the label `variable_name`.
 
-* `renamecolid`: When `id` is not set, the argument to `renamecolid` must be an `Int`. And when `id` is set, the `renamecolid` will be applied to stringified `df[!, id]`.
+* `renamecolid`: When `id` is not set, the argument to `renamecolid` must be an `Int`. And when `id` is set, the `renamecolid` will be applied to each row of `df[!, id]` as Tuple.
+* When `id` is set, `renamecolid` is defined as `x -> identity(string(values(x)))`
 """
 
 function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_")
@@ -67,8 +68,13 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex; 
         if renamecolid === nothing
             renamecolid = _default_renamecolid_function_withid
         end
-        @assert length(unique(df[!, id])) == nrow(df) "Duplicate ids are not allowed."
-        new_col_names, row_names = _simple_generate_names_withid(renamecolid, renamerowid, df[!,id], names(ECol))
+        if size(df[!,id],2) > 1
+            ids_vals = Tables.rowtable(df[!,id])
+        else
+            ids_vals = df[!,id]
+        end
+        @assert length(unique(ids_vals)) == nrow(df) "Duplicate ids are not allowed."
+        new_col_names, row_names = _simple_generate_names_withid(renamecolid, renamerowid, ids_vals, names(ECol))
     end
 
     _simple_transpose_df_generate(T, in_cols, row_names, new_col_names, variable_name)
@@ -101,23 +107,23 @@ function update_outputmat!(outputmat, x, gridx, which_col, row_names, i)
     end
 end
 
-function update_outputmat!(outputmat, x, gridx, ids, dict_cols::Dict, row_names, i, row_t)
+function update_outputmat!(outputmat, x, gridx, ids, dict_cols::Dict, row_names, i, row_t, which_col)
     n_row_names = length(row_names)
     gid = gridx[i]
     selected_col = dict_cols[ids[i]]
-    if !ismissing(outputmat[(gid-1)*n_row_names+1, selected_col])
-        throw(AssertionError("Duplicate id for $(ids[i]) in group $(row_t[gid])"))
+    if which_col[gid] > selected_col
+        throw(AssertionError("Duplicate id for $(ids[i]) in group $(row_t[i])"))
     end
     for j in 1:n_row_names
         outputmat[(gid-1)*n_row_names+j, selected_col] = x[j][i]
     end
 end
 
-function _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t)
+function _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t; default_fill = missing)
 
     @assert _check_allocation_limit(nonmissingtype(T), length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
 
-    outputmat = fill!(Matrix{Union{T, Missing}}(undef,length(row_names)*gdf.ngroups, length(new_col_names)),missing)
+    outputmat = fill!(Matrix{Union{T, Missing}}(undef,length(row_names)*gdf.ngroups, length(new_col_names)),default_fill)
 
     which_col = zeros(Int, gdf.ngroups)
 
@@ -134,11 +140,11 @@ function _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_co
     (group_info, outputmat)
 end
 
-function _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids, new_col_names, row_names, dict_cols, row_t)
+function _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids, new_col_names, row_names, dict_cols, row_t; default_fill = missing)
 
     @assert _check_allocation_limit(nonmissingtype(T), length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
 
-    outputmat = fill!(Matrix{Union{T, Missing}}(undef,length(row_names)*gdf.ngroups, length(new_col_names)),missing)
+    outputmat = fill!(Matrix{Union{T, Missing}}(undef,length(row_names)*gdf.ngroups, length(new_col_names)), default_fill)
 
     which_col = zeros(Int, gdf.ngroups)
 
@@ -150,7 +156,7 @@ function _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids, new_
         if which_col[gid] == 1
             update_group_info!(group_info, row_t, gridx, row_names, i)
         end
-        update_outputmat!(outputmat, in_cols, gridx, ids, dict_cols, row_names, i, row_t)
+        update_outputmat!(outputmat, in_cols, gridx, ids, dict_cols, row_names, i, row_t, which_col)
     end
     (group_info, outputmat)
 end
@@ -170,12 +176,13 @@ end
         id = nothing,
         renamecolid = (x -> "_c" * string(x)),
         renamerowid = identity,
-        variable_name = "_variables_")
+        variable_name = "_variables_",
+        default_fill = missing)
 
 transposes `df[!, cols]` within each group constructed by `gcols`.
 """
 
-function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, gcols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_")
+function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, gcols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_", default_fill = missing)
     ECol = eachcol(df[!,cols])
     EColG = eachcol(df[!,gcols])
     T = mapreduce(eltype, promote_type, ECol)
@@ -186,14 +193,14 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
     gdf = groupby(df, gcols)
     gridx = gdf.groups
 
-    fast_stack = false
-    if gdf.ngroups == nrow(df)
-        # we are doing a stack
-        if nonmissingtype(T) <: Number
-            # we can use fast approach
-            fast_stack = true
-        end
-    end
+    # fast_stack = false
+    # if gdf.ngroups == nrow(df)
+    #     # we are doing a stack
+    #     if nonmissingtype(T) <: Number
+    #         # we can use faster approach or implement view option
+    #         fast_stack = true
+    #     end
+    # end
 
     if id === nothing
         if renamecolid === nothing
@@ -204,33 +211,39 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
 
         new_col_names, row_names = _simple_generate_names_withoutid(renamecolid, renamerowid, out_ncol, names(ECol))
 
-        group_info, outputmat = _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t)
+        group_info, outputmat = _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t; default_fill = default_fill)
     else
         if renamecolid === nothing
             renamecolid = _default_renamecolid_function_withid
         end
+        # we assume the unique function keep the same order as original data, which is the case sofar
 
-        unique_ids = unique(df[!,id])
+        if size(df[!,id],2) > 1
+            ids_vals = Tables.rowtable(df[!,id])
+        else
+            ids_vals = df[!,id]
+        end
+        unique_ids = unique(ids_vals)
         out_ncol = length(unique_ids)
 
         new_col_names, row_names = _simple_generate_names_withid(renamecolid, renamerowid, unique_ids, names(ECol))
 
         dict_out_col = Dict(unique_ids .=> 1:out_ncol)
-        group_info, outputmat = _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, df[!, id], new_col_names, row_names, dict_out_col, row_t)
+        group_info, outputmat = _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids_vals, new_col_names, row_names, dict_out_col, row_t; default_fill = default_fill)
     end
 
     new_var_label = Symbol(variable_name)
 
     df1 = insertcols!(DataFrame(outputmat, new_col_names),1, new_var_label => repeat(row_names, outer = gdf.ngroups))
     DataFrames.hcat!(DataFrame(group_info),df1)
-    
+
 end
 
 
 df_transpose(df::AbstractDataFrame, cols::DataFrames.ColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_") = df_transpose(df,[cols]; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name)
 
-df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, gcols::DataFrames.ColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_") = df_transpose(df,cols, [gcols]; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name)
+df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, gcols::DataFrames.ColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_", default_fill = missing) = df_transpose(df,cols, [gcols]; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name, default_fill = default_fill)
 
-df_transpose(df::AbstractDataFrame, cols::DataFrames.ColumnIndex, gcols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_") = df_transpose(df, [cols], gcols; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name)
+df_transpose(df::AbstractDataFrame, cols::DataFrames.ColumnIndex, gcols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_", default_fill = missing) = df_transpose(df, [cols], gcols; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name, default_fill = default_fill)
 
-df_transpose(df::AbstractDataFrame, cols::DataFrames.ColumnIndex, gcols::DataFrames.ColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_") = df_transpose(df, [cols], [gcols]; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name)
+df_transpose(df::AbstractDataFrame, cols::DataFrames.ColumnIndex, gcols::DataFrames.ColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_", default_fill = missing) = df_transpose(df, [cols], [gcols]; id = id, renamecolid = renamecolid, renamerowid = renamerowid, variable_name = variable_name, default_fill = default_fill)
