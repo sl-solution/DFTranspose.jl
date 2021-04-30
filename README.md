@@ -257,6 +257,39 @@ julia> df_transpose(df, :load, :time, id = 1:2)
 ─────┼──────────────────────────────────────────────────────────────────────────────────────────────
    1 │     1  load                 0.877347           0.412013          0.969407           0.641831
    2 │     2  load                 0.856583           0.409253          0.235768           0.655087
+
+julia> df = DataFrame(A_2018=1:4, A_2019=5:8, B_2017=9:12,
+                        B_2018=9:12, B_2019 = [missing,13,14,15],
+                         ID = [1,2,3,4])
+4×6 DataFrame
+  Row │ A_2018  A_2019  B_2017  B_2018  B_2019   ID    
+      │ Int64   Int64   Int64   Int64   Int64?   Int64
+ ─────┼────────────────────────────────────────────────
+    1 │      1       5       9       9  missing      1
+    2 │      2       6      10      10       13      2
+    3 │      3       7      11      11       14      3
+    4 │      4       8      12      12       15      4
+
+julia> renamerowid(x) =  match(r"[0-9]+",x).match
+julia> dfA = df_transpose(df, r"A", :ID, renamerowid = renamerowid, variable_name = "Year", renamecolid = x->"A");
+julia> dfB = df_transpose(df, r"B", :ID, renamerowid = renamerowid, variable_name = "Year", renamecolid = x->"B");
+julia> outerjoin(dfA, dfB, on = [:ID, :Year])
+12×4 DataFrame
+ Row │ ID     Year       A        B       
+     │ Int64  SubStrin…  Int64?   Int64?  
+─────┼────────────────────────────────────
+   1 │     1  2018             1        9
+   2 │     1  2019             5  missing
+   3 │     2  2018             2       10
+   4 │     2  2019             6       13
+   5 │     3  2018             3       11
+   6 │     3  2019             7       14
+   7 │     4  2018             4       12
+   8 │     4  2019             8       15
+   9 │     1  2017       missing        9
+  10 │     2  2017       missing       10
+  11 │     3  2017       missing       11
+  12 │     4  2017       missing       12
 ```
 
 # Relation to other functions
