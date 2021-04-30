@@ -1,6 +1,6 @@
 # DFTranspose.jl
 
-DFTranspose is a `Julia` package to explore the implementation of a new function for reshaping `DataFrame`s.
+`DFTranspose.jl` is a `Julia` package to explore the implementation of a new function for reshaping `DataFrame`s.
 
 See https://github.com/JuliaData/DataFrames.jl/issues/2732#issue-865607582
 
