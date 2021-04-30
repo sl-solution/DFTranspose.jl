@@ -25,9 +25,9 @@ When an `id` variable is specified, `df_transpose` transpose the data as above, 
 
 When a set of groupby variables are specified, the `df_transpose` function repeats the simple transposing of data within each group constructed by groupby variables. Like the simplest case, and `id` variable can be used to label the columns of the output data frame.
 
-> The order of the output data frame is based on the order of observations in the input data frame.
-> Currently if an `id` value is repeated within a group, `df_transpose` throw an error. However, this may change in future.
-> Missing values can be a group level or a value for the `id` variable. They will be treated as a category.
+> * The order of the output data frame is based on the order of observations in the input data frame.
+> * Currently if an `id` value is repeated within a group, `df_transpose` throw an error. However, this may change in future.
+> * Missing values can be a group level or a value for the `id` variable. They will be treated as a category.
 
 ![Groupby Transposing](/images/groupby-transpose.svg)
 
