@@ -21,12 +21,12 @@ In its simplest form `df_transpose` transposes the specified columns of a `DataF
 
 ![Simple Transposing](/images/simple-transpose.svg)
 
-When an `id` variable is specified, `df_transpose` transpose the data as above, however, use the values of the `id` variable to label the columns of the output data frame. `renamecolid` can be used to modify the labels on fly.
+When an `id` variable is specified, `df_transpose` transpose the data as above, however, use the values of the `id` variable to label the columns of the output data frame. `renamecolid` can be used to modify the labels on fly. When there are multiple `id` variables are used, the default `renamecolid` function assigns each label by a Tuple of the values of those variables (see examples).
 
 When a set of groupby variables are specified, the `df_transpose` function repeats the simple transposing of data within each group constructed by groupby variables. Like the simplest case, and `id` variable can be used to label the columns of the output data frame.
 
 > * The order of the output data frame is based on the order of observations in the input data frame.
-> * Currently if an `id` value is repeated within a group, `df_transpose` throw an error. However, this may change in future.
+> * Currently if `id` value(s) is repeated within a group, `df_transpose` throw an error. However, this may change in future.
 > * Missing values can be a group level or a value for the `id` variable. They will be treated as a category.
 
 ![Groupby Transposing](/images/groupby-transpose.svg)
@@ -125,6 +125,21 @@ julia> df_transpose(df, 2:4, :group, id = :e)
    7 │     3  b            missing  missing  missing  missing        2        2
    8 │     3  c            missing  missing  missing  missing        1        1
    9 │     3  d            missing  missing  missing  missing        5        6
+
+julia> df_transpose(df, 2:4, :group, id = :e, default_fill = 0)
+9×8 DataFrame
+ Row │ group  _variables_  a       b       c       d       e       f      
+     │ Int64  String       Int64?  Int64?  Int64?  Int64?  Int64?  Int64?
+─────┼────────────────────────────────────────────────────────────────────
+   1 │     1  b                 1       1       0       0       0       0
+   2 │     1  c                 1       1       0       0       0       0
+   3 │     1  d                 1       2       0       0       0       0
+   4 │     2  b                 0       0       1       2       0       0
+   5 │     2  c                 0       0       1       1       0       0
+   6 │     2  d                 0       0       3       4       0       0
+   7 │     3  b                 0       0       0       0       2       2
+   8 │     3  c                 0       0       0       0       1       1
+   9 │     3  d                 0       0       0       0       5       6
 ```
 
 **Advanced usage**
@@ -189,7 +204,59 @@ julia> df_transpose(df, Not(:person), :person,
    6 │     2.0  2021-01-01          2.0
    7 │     3.0  2020-11-01          3.3
    8 │     3.0  2020-12-01          3.0
-   9 │     3.0  2021-01-01          3.2            
+   9 │     3.0  2021-01-01          3.2          
+
+  # emulating the pivoting in python pandas
+julia> df = DataFrame(paddockId= [0, 0, 1, 1, 2, 2],
+                        color= ["red", "blue", "red", "blue", "red", "blue"],
+                        count= [3, 4, 3, 4, 3, 4],
+                        weight= [0.2, 0.3, 0.2, 0.3, 0.2, 0.2])
+6×4 DataFrame
+ Row │ paddockId  color   count  weight  
+     │ Int64      String  Int64  Float64
+─────┼───────────────────────────────────
+   1 │         0  red         3      0.2
+   2 │         0  blue        4      0.3
+   3 │         1  red         3      0.2
+   4 │         1  blue        4      0.3
+   5 │         2  red         3      0.2
+   6 │         2  blue        4      0.2
+
+julia> df_transpose( df_transpose(df, [:count,:weight], [:paddockId,:color]),
+                     :_c1, :paddockId, id = 2:3)
+3×6 DataFrame
+ Row │ paddockId  _variables_  ("red", "count")  ("red", "weight")  ("blue", "count")  ("blue", "weight")
+     │ Int64      String       Float64?          Float64?           Float64?           Float64?           
+─────┼────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │         0  _c1                       3.0                0.2                4.0                 0.3
+   2 │         1  _c1                       3.0                0.2                4.0                 0.3
+   3 │         2  _c1                       3.0                0.2                4.0                 0.2
+
+julia> df = DataFrame(region = repeat(["North","North","South","South"],2),
+             fuel_type = repeat(["gas","coal"],4),
+             load = rand(8),
+             time = [1,1,1,1,2,2,2,2],
+             )
+8×4 DataFrame
+  Row │ region  fuel_type  load      time  
+      │ String  String     Float64   Int64
+ ─────┼────────────────────────────────────
+    1 │ North   gas        0.877347      1
+    2 │ North   coal       0.412013      1
+    3 │ South   gas        0.969407      1
+    4 │ South   coal       0.641831      1
+    5 │ North   gas        0.856583      2
+    6 │ North   coal       0.409253      2
+    7 │ South   gas        0.235768      2
+    8 │ South   coal       0.655087      2
+
+julia> df_transpose(df, :load, :time, id = 1:2)
+2×6 DataFrame
+ Row │ time   _variables_  ("North", "gas")  ("North", "coal")  ("South", "gas")  ("South", "coal")
+     │ Int64  String       Float64?          Float64?           Float64?          Float64?          
+─────┼──────────────────────────────────────────────────────────────────────────────────────────────
+   1 │     1  load                 0.877347           0.412013          0.969407           0.641831
+   2 │     2  load                 0.856583           0.409253          0.235768           0.655087
 ```
 
 # Relation to other functions
