@@ -86,6 +86,27 @@ const ≅ = isequal
     dfs = sort(stack(df, r"x"), [:g, :id])
 
     @test dft == dfs
+
+
+    df = DataFrame(group = repeat(1:3, inner = 2),
+                                 b = repeat(1:2, inner = 3),
+                                 c = repeat(1:1, inner = 6),
+                                 d = repeat(1:6, inner = 1),
+                                 e = string.('a':'f'))
+    allowmissing!(df)
+    df[2, :b] = missing
+    df[4, :d] = missing
+    df2 = df_transpose(df, 2:4, [:group], id = :e, default_fill = 0)
+
+    df3 = DataFrame(group = repeat(1:3, inner = 3),
+                    _variables_ = string.(repeat('b':'d', 3)),
+                    a = [1,1,1,0,0,0,0,0,0],
+                    b = [missing,1,2,0,0,0,0,0,0],
+                    c = [0,0,0, 1,1,3, 0,0,0],
+                    d = [0,0,0, 2,1,missing, 0,0,0],
+                    e = [0,0,0,0,0,0,2,1,5],
+                    f = [0,0,0,0,0,0,2,1,6] )
+    @test df2 ≅ df3
 end
 
 
