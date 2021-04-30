@@ -27,7 +27,7 @@ When a set of groupby variables are specified, the `df_transpose` function repea
 
 **The following behaviours may change in future**
 > * The order of the output data frame is based on the order of observations in the input data frame.
-> * Currently if `id` value(s) is repeated within a group, `df_transpose` throw an error.
+> * Currently if `id` value(s) is repeated within a group, `df_transpose` throws an error.
 > * Missing values can be a group level or a value for the `id` variable. They will be treated as a category.
 
 ![Groupby Transposing](/images/groupby-transpose.svg)
@@ -303,7 +303,7 @@ julia> df_transpose( df_transpose(df, [:count,:weight], [:paddockId,:color]),
 
 * `df_transpose` only permutes the columns `cols`.
 * If no variable is provided as `id`, it generates the column names of the new data set by mapping a function (`renamecolid`) on the sequence of rows in `df`.
-* A function (`renamerowid`) applied to the rows id in the output data frame before generating the `variable_name` columns.
+* A function (`renamerowid`) applies to the rows ids in the output data frame before generating the `variable_name` columns.
 
 ### Examples
 
@@ -379,7 +379,7 @@ julia> df_transpose(df2, [:b, :c, :d], id = :a, variable_name = "new_col")
 
 `df_transpose(df::AbstractDataFrame, cols, gcols)` can be used to emulate `stack` functionalities. Generally speaking, `stack` transposes each row of a data frame. Thus, to achieve the `stack` functionality each row of the input data frame should be an individual group. This can be done by inserting a new column to the input data frame or using `df_transpose` twice.
 
-Currently `df_transpose` doesn't support `view` keyword (see help for `stack` function), however, this may change in future.
+`df_transpose` cannot create the output data as a `view` (see help for `stack` function).
 
 ### Examples
 
