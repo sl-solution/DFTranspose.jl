@@ -31,13 +31,13 @@ function _simple_transpose_df_generate(T, in_cols, row_names, new_col_names, var
 end
 
 """
-    df_transpose(df::AbstractDataFrame, cols;
+    df_transpose(df::AbstractDataFrame, cols [, gcols];
         id = nothing,
         renamecolid = (x -> "_c" * string(x)),
         renamerowid = identity,
         variable_name = "_variables_")
 
-transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `renamecolid` function to generate the new columns labels. The `renamerowid` function is applied to stringified names of `df[!, cols]` and attached them to the output as a new column with the label `variable_name`.
+transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `renamecolid` function to generate the new columns labels. The `renamerowid` function is applied to stringified names of `df[!, cols]` and attached them to the output as a new column with the label `variable_name`. When `gcols` is used the transposing is done within each group constructed by `gcols`. If the number of rows in a group is smaller than other groups, the extra columns in the output data frame is filled with `missing` (the default value can be changed by using `default_fill` argument) for that group.
 
 * `renamecolid`: When `id` is not set, the argument to `renamecolid` must be an `Int`. And when `id` is set, the `renamecolid` will be applied to each row of `df[!, id]` as Tuple.
 * When `id` is set, `renamecolid` is defined as `x -> identity(string(values(x)))`
@@ -147,19 +147,6 @@ function _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids, new_
     end
     (group_info, outputmat)
 end
-
-
-
-"""
-    df_transpose(df::AbstractDataFrame, cols, gcols;
-        id = nothing,
-        renamecolid = (x -> "_c" * string(x)),
-        renamerowid = identity,
-        variable_name = "_variables_",
-        default_fill = missing)
-
-transposes `df[!, cols]` within each group constructed by `gcols`.
-"""
 
 function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, gcols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_", default_fill = missing)
     ECol = eachcol(df[!,cols])
