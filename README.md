@@ -21,13 +21,13 @@ The `DFTranspose.jl` package only exports one function, `df_transpose`, which ca
    df_transpose(df, cols [, groupbycols]; kwargs...)
 ```
 
-In its simplest form `df_transpose` transposes the specified columns of a `DataFrame`, and attaches a new column to the output data frame to track the original names of the transposed variables. The label of this column can be controlled by `variable_name` keyword.
+In its simplest form `df_transpose` transposes the specified columns, `cols`, of a `DataFrame`, and attaches a new column to the output data frame to track the original names of the transposed variables. The label of this column can be controlled by `variable_name` keyword.
 
 ![Simple Transposing](/images/simple-transpose.svg)
 
 When an `id` variable is specified, `df_transpose` transpose the data as above, however, it uses the values of the `id` variable to label the columns of the output data frame. `renamecolid` can be used to modify these labels on fly. When there are multiple `id` variables, the default `renamecolid` function assigns each label by a Tuple of the values of those variables (see examples).
 
-When a set of groupby variables are specified, the `df_transpose` function repeats the simple transposing of data within each group constructed by groupby variables. Like the simplest case, an `id` variable can be used to label the columns of the output data frame.
+When a set of groupby variables, `groupbycols`, are specified, the `df_transpose` function repeats the simple transposing of data within each group constructed by groupby variables. Like the simplest case, an `id` variable can be used to label the columns of the output data frame.
 
 **The following behaviours may change in future**
 > * The order of the output data frame is based on the order returned by `groupby` function.
