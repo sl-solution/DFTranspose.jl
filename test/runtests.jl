@@ -107,6 +107,100 @@ const ≅ = isequal
                     e = [0,0,0,0,0,0,2,1,5],
                     f = [0,0,0,0,0,0,2,1,6] )
     @test df2 ≅ df3
+
+    df = DataFrame(id = ["r3", "r1", "r2" , "r4"], x1 = [1,2,3,4], x2 = [1,4,9,16])
+    df2 = df_transpose(df, [:x1,:x2], id = :id)
+    df3 = DataFrame([["x1", "x2"],
+                        [1, 1],
+                        [2, 4],
+                        [3, 9],
+                        [4, 16]],
+                        [:_variables_, :r3, :r1, :r2, :r4])
+    @test df3 == df2
+
+    pop = DataFrame(country = ["c1","c1","c2","c2","c3","c3"],
+                            sex = ["male", "female", "male", "female", "male", "female"],
+                            pop_2000 = [100, 120, 150, 155, 170, 190],
+                            pop_2010 = [110, 120, 155, 160, 178, 200],
+                            pop_2020 = [115, 130, 161, 165, 180, 203])
+
+    popt = df_transpose(pop, r"pop_", :country,
+                            id = :sex, variable_name = "year",
+                            renamerowid = x -> match(r"[0-9]+",x).match, renamecolid = x -> x * "_pop")
+    poptm = DataFrame([ ["c1", "c1", "c1", "c2", "c2", "c2", "c3", "c3", "c3"],
+            SubString{String}["2000", "2010", "2020", "2000", "2010", "2020", "2000", "2010", "2020"],
+            Union{Missing, Int64}[100, 110, 115, 150, 155, 161, 170, 178, 180],
+            Union{Missing, Int64}[120, 120, 130, 155, 160, 165, 190, 200, 203]],
+            [:country,:year,:male_pop,:female_pop])
+
+    @test popt == poptm
+
+    df =  DataFrame(region = repeat(["North","North","South","South"],2),
+                 fuel_type = repeat(["gas","coal"],4),
+                 load = [.1,.2,.5,.1,6.,4.3,.1,6.],
+                 time = [1,1,1,1,2,2,2,2],
+                 )
+
+    df2 = df_transpose(df, :load, :time, id = 1:2)
+    df3 = DataFrame([[1, 2],
+         ["load", "load"],
+         Union{Missing, Float64}[0.1, 6.0],
+         Union{Missing, Float64}[0.2, 4.3],
+         Union{Missing, Float64}[0.5, 0.1],
+         Union{Missing, Float64}[0.1, 6.0]], [:time,:_variables_,Symbol("(\"North\", \"gas\")"),Symbol("(\"North\", \"coal\")"),Symbol("(\"South\", \"gas\")"),Symbol("(\"South\", \"coal\")")])
+
+     @test df2 == df3
+     df = DataFrame(A_2018=1:4, A_2019=5:8, B_2017=9:12,
+                             B_2018=9:12, B_2019 = [missing,13,14,15],
+                              ID = [1,2,3,4])
+      f(x) =  match(r"[0-9]+",x).match
+      dfA = df_transpose(df, r"A", :ID, renamerowid = f, variable_name = "Year", renamecolid = x->"A");
+      dfB = df_transpose(df, r"B", :ID, renamerowid = f, variable_name = "Year", renamecolid = x->"B");
+      df2 = outerjoin(dfA, dfB, on = [:ID, :Year])
+      df3 = DataFrame([[1, 1, 2, 2, 3, 3, 4, 4, 1, 2, 3, 4],
+                 SubString{String}["2018", "2019", "2018", "2019", "2018", "2019", "2018", "2019", "2017", "2017", "2017", "2017"],
+                 Union{Missing, Int64}[1, 5, 2, 6, 3, 7, 4, 8, missing, missing, missing, missing],
+                 Union{Missing, Int64}[9, missing, 10, 13, 11, 14, 12, 15, 9, 10, 11, 12]], [:ID,:Year,:A,:B])
+        @test df2 ≅ df3
+        df = DataFrame(paddockId= [0, 0, 1, 1, 2, 2],
+                                color= ["red", "blue", "red", "blue", "red", "blue"],
+                                count= [3, 4, 3, 4, 3, 4],
+                                weight= [0.2, 0.3, 0.2, 0.3, 0.2, 0.2])
+        df2 = df_transpose( df_transpose(df, [:count,:weight],[:paddockId,:color]),
+                             :_c1, :paddockId, id = 2:3)
+         df3 = DataFrame([[0, 1, 2],
+                         ["_c1", "_c1", "_c1"],
+                         Union{Missing, Float64}[3.0, 3.0, 3.0],
+                         Union{Missing, Float64}[0.2, 0.2, 0.2],
+                         Union{Missing, Float64}[4.0, 4.0, 4.0],
+                         Union{Missing, Float64}[0.3, 0.3, 0.2]],[ :paddockId,:_variables_,Symbol("(\"red\", \"count\")"),Symbol("(\"red\", \"weight\")"),Symbol("(\"blue\", \"count\")"),Symbol("(\"blue\", \"weight\")")])
+
+         @test df2 == df3
+
+        df = DataFrame(x1 = [9,2,8,6,8], x2 = [8,1,6,2,3], x3 = [6,5,3,10,8])
+        df2 = df_transpose(df, r"x", renamerowid = x -> match(r"[0-9]+",x).match,renamecolid = x -> "_column_" * string(x))
+        df3 = DataFrame([SubString{String}["1", "2", "3"],
+                         [9, 8, 6],
+                         [2, 1, 5],
+                         [8, 6, 3],
+                         [6, 2, 10],
+                         [8, 3, 8]],[:_variables_,:_column_1,:_column_2,:_column_3,:_column_4,:_column_5])
+         @test df2 == df3
+         df = DataFrame(a=["x", "y"], b=[1, "two"], c=[3, 4], d=[true, false])
+         df2 = df_transpose(df, [:b, :c, :d], id = :a, variable_name = "new_col")
+         df3 = DataFrame([["b", "c", "d"],
+                         Any[1, 3, true],
+                         Any["two", 4, false]],[:new_col,:x,:y])
+         @test df2 == df3
+         df = DataFrame(rand(1:100,100,4),:auto)
+         DataFrames.hcat!(df, DataFrame(rand(100,3),:auto), makeunique = true)
+         insertcols!(df,1, :id=>Symbol.(100:-1:1))
+
+         df2 = df_transpose(df, r"x", id = :id, variable_name = "id")
+         df3 = permutedims(df, :id)
+
+         @test df2 == df3
+
 end
 
 
