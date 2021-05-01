@@ -279,7 +279,7 @@ julia> df = DataFrame(paddockId= [0, 0, 1, 1, 2, 2],
 6×4 DataFrame
  Row │ paddockId  color   count  weight  
      │ Int64      String  Int64  Float64
- ─────┼───────────────────────────────────
+─────┼───────────────────────────────────
    1 │         0  red         3      0.2
    2 │         0  blue        4      0.3
    3 │         1  red         3      0.2
