@@ -13,12 +13,6 @@ function _simple_df_transpose!(outx, inx)
     end
 end
 
-function _generate_col_row_names(renamecolid, renamerowid, size1, dfnames)
-    new_col_names = map(renamecolid, 1:size1)
-
-    row_names = map(renamerowid, dfnames)
-    (new_col_names, row_names)
-end
 function _generate_col_row_names(renamecolid, renamerowid, ids, dfnames)
 
     new_col_names = map(renamecolid, ids)
@@ -86,6 +80,7 @@ function _obtain_maximum_groups_size(gridx, ngroups)
     maximum(levels)
 end
 
+# gaining information about group info with out any assumption about the orders
 function update_group_info!(group_info, row_t, gridx, row_names, i)
     n_row_names = length(row_names)
     gid = gridx[i]
@@ -106,9 +101,6 @@ function update_outputmat!(outputmat, x, gridx, ids, dict_cols::Dict, row_names,
     n_row_names = length(row_names)
     gid = gridx[i]
     selected_col = dict_cols[ids[i]]
-    if which_col[gid] > selected_col
-        throw(AssertionError("Duplicate id for $(ids[i]) in group $(row_t[i])"))
-    end
     for j in 1:n_row_names
         outputmat[(gid-1)*n_row_names+j, selected_col] = x[j][i]
     end
@@ -156,15 +148,7 @@ function _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids, new_
     (group_info, outputmat)
 end
 
-# if want a faster way in the case of stack
-function _fill_outputmat_and_group_info_fast_stack(in_cols, row_t)
 
-    outputmat = vcat(in_cols...)
-
-    group_info = repeat(row_t, outer = length(in_cols))
-
-    (group_info, outputmat)
-end
 
 """
     df_transpose(df::AbstractDataFrame, cols, gcols;
@@ -188,6 +172,7 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
     gdf = groupby(df, gcols)
     gridx = gdf.groups
 
+    # stack can be done fast
     # fast_stack = false
     # if gdf.ngroups == nrow(df)
     #     # we are doing a stack
@@ -218,6 +203,11 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
         else
             ids_vals = df[!,id]
         end
+
+        grv_plus_idv = union(names(df,gcols),names(df,id))
+        check_unique_ids_within_groups = combine(groupby(df, grv_plus_idv), 1=>length=>:__length_id_within_groups__)
+        @assert all(isequal(1), check_unique_ids_within_groups.__length_id_within_groups__) "Duplicate id within a group is not allowed."
+
         unique_ids = unique(ids_vals)
         out_ncol = length(unique_ids)
 
