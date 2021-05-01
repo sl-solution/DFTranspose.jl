@@ -447,7 +447,7 @@ julia> df_transpose(df, [:c, :d], [:RowID, :a])
 
 ## unstack
 
-`df_transpose(df::AbstractDataFrame, cols, gcols)` can be used to emulate `unstack` functionalities. Additionally, `df_transpose` can unstack multiple measure variables.
+When only one column is set for `cols` argument  `df_transpose(df::AbstractDataFrame, cols, gcols)` can be used to emulate `unstack` functionality.
 
 ### Examples
 
