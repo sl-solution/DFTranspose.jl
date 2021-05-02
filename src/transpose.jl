@@ -31,18 +31,72 @@ function _simple_transpose_df_generate(T, in_cols, row_names, new_col_names, var
 end
 
 """
-    df_transpose(df::AbstractDataFrame, cols [, gcols];
+    df_transpose(df::AbstractDataFrame, cols [, groupbycols];
         id = nothing,
         renamecolid = (x -> "_c" * string(x)),
         renamerowid = identity,
         variable_name = "_variables_")
 
-transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `renamecolid` function to generate the new columns labels. The `renamerowid` function is applied to stringified names of `df[!, cols]` and attached them to the output as a new column with the label `variable_name`. When `gcols` is used the transposing is done within each group constructed by `gcols`. If the number of rows in a group is smaller than other groups, the extra columns in the output data frame is filled with `missing` (the default value can be changed by using `default_fill` argument) for that group.
+transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `renamecolid` function to generate the new columns labels. The `renamerowid` function is applied to stringified names of `df[!, cols]` and attached them to the output as a new column with the label `variable_name`. When `groupbycols` is used the transposing is done within each group constructed by `groupbycols`. If the number of rows in a group is smaller than other groups, the extra columns in the output data frame is filled with `missing` (the default value can be changed by using `default_fill` argument) for that group.
 
 * `renamecolid`: When `id` is not set, the argument to `renamecolid` must be an `Int`. And when `id` is set, the `renamecolid` will be applied to each row of `df[!, id]` as Tuple.
 * When `id` is set, `renamecolid` is defined as `x -> identity(string(values(x)))`
-"""
 
+```jldoctest
+julia> df = DataFrame(x1 = [1,2,3,4], x2 = [1,4,9,16])
+ 4×2 DataFrame
+ Row │ x1     x2
+     │ Int64  Int64
+─────┼──────────────
+   1 │     1      1
+   2 │     2      4
+   3 │     3      9
+   4 │     4     16
+
+julia> df_transpose(df, [:x1,:x2])
+2×5 DataFrame
+ Row │ _variables_  _c1    _c2    _c3    _c4
+     │ String       Int64  Int64  Int64  Int64
+─────┼─────────────────────────────────────────
+   1 │ x1               1      2      3      4
+   2 │ x2               1      4      9     16
+
+julia> pop = DataFrame(country = ["c1","c1","c2","c2","c3","c3"],
+                       sex = repeat(["male", "female"],3),
+                       pop_2000 = [100, 120, 150, 155, 170, 190],
+                       pop_2010 = [110, 120, 155, 160, 178, 200],
+                       pop_2020 = [115, 130, 161, 165, 180, 203])
+6×5 DataFrame
+Row │ country  sex     pop_2000  pop_2010  pop_2020
+    │ String   String  Int64     Int64     Int64
+────┼───────────────────────────────────────────────
+  1 │ c1       male         100       110       115
+  2 │ c1       female       120       120       130
+  3 │ c2       male         150       155       161
+  4 │ c2       female       155       160       165
+  5 │ c3       male         170       178       180
+  6 │ c3       female       190       200       203
+
+julia> df_transpose(pop, r"pop_", :country,
+                    id = :sex, variable_name = "year",
+                    renamerowid = x -> match(r"[0-9]+",x).match,
+                    renamecolid = x -> x * "_pop")
+9×4 DataFrame
+ Row │ country  year       male_pop  female_pop
+     │ String   SubStrin…  Int64?    Int64?
+─────┼──────────────────────────────────────────
+   1 │ c1       2000            100         120
+   2 │ c1       2010            110         120
+   3 │ c1       2020            115         130
+   4 │ c2       2000            150         155
+   5 │ c2       2010            155         160
+   6 │ c2       2020            161         165
+   7 │ c3       2000            170         190
+   8 │ c3       2010            178         200
+   9 │ c3       2020            180         203
+
+```
+"""
 function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_")
     ECol = eachcol(df[!,cols])
     T = mapreduce(eltype, promote_type, ECol)
@@ -109,8 +163,8 @@ end
 function _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t; default_fill = missing)
 
     @assert _check_allocation_limit(nonmissingtype(T), length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
-
-    outputmat = fill!(Matrix{Union{T, Missing}}(undef,length(row_names)*gdf.ngroups, length(new_col_names)),default_fill)
+    CT = promote_type(T, typeof(default_fill))
+    outputmat = fill!(Matrix{CT}(undef,length(row_names)*gdf.ngroups, length(new_col_names)),default_fill)
 
     which_col = zeros(Int, gdf.ngroups)
 
@@ -130,8 +184,8 @@ end
 function _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids, new_col_names, row_names, dict_cols, row_t; default_fill = missing)
 
     @assert _check_allocation_limit(nonmissingtype(T), length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
-
-    outputmat = fill!(Matrix{Union{T, Missing}}(undef,length(row_names)*gdf.ngroups, length(new_col_names)), default_fill)
+    CT = promote_type(T, typeof(default_fill))
+    outputmat = fill!(Matrix{CT}(undef,length(row_names)*gdf.ngroups, length(new_col_names)), default_fill)
 
     which_col = zeros(Int, gdf.ngroups)
 
