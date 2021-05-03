@@ -134,18 +134,18 @@ julia> df_transpose(df, 2:4, :group, id = :e)
 
 julia> df_transpose(df, 2:4, :group, id = :e, default_fill = 0)
 9×8 DataFrame
- Row │ group  _variables_  a       b       c       d       e       f      
-     │ Int64  String       Int64?  Int64?  Int64?  Int64?  Int64?  Int64?
-─────┼────────────────────────────────────────────────────────────────────
-   1 │     1  b                 1       1       0       0       0       0
-   2 │     1  c                 1       1       0       0       0       0
-   3 │     1  d                 1       2       0       0       0       0
-   4 │     2  b                 0       0       1       2       0       0
-   5 │     2  c                 0       0       1       1       0       0
-   6 │     2  d                 0       0       3       4       0       0
-   7 │     3  b                 0       0       0       0       2       2
-   8 │     3  c                 0       0       0       0       1       1
-   9 │     3  d                 0       0       0       0       5       6
+ Row │ group  _variables_  a      b      c      d      e      f
+     │ Int64  String       Int64  Int64  Int64  Int64  Int64  Int64
+─────┼──────────────────────────────────────────────────────────────
+   1 │     1  b                1      1      0      0      0      0
+   2 │     1  c                1      1      0      0      0      0
+   3 │     1  d                1      2      0      0      0      0
+   4 │     2  b                0      0      1      2      0      0
+   5 │     2  c                0      0      1      1      0      0
+   6 │     2  d                0      0      3      4      0      0
+   7 │     3  b                0      0      0      0      2      2
+   8 │     3  c                0      0      0      0      1      1
+   9 │     3  d                0      0      0      0      5      6
 ```
 
 **Advanced usage**
