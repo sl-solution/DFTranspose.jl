@@ -184,7 +184,7 @@ function update_outputmat!(outputmat, x, gridx, ids, dict_cols::Dict, n_row_name
             selected_col = dict_cols[ids[i]]
             _row_ = (gid-1)*n_row_names+j
             if _is_cell_filled[_row_, selected_col]
-                throw(AssertionError("Duplicate id within a group is not allowd"))
+                throw(AssertionError("Duplicate id within a group is not allowed"))
             else
                 outputmat[selected_col][_row_] = x[j][i]
                 _is_cell_filled[_row_, selected_col] = true
