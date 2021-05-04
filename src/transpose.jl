@@ -31,13 +31,13 @@ function _simple_transpose_df_generate(T, in_cols, row_names, new_col_names, var
 end
 
 """
-    df_transpose(df::AbstractDataFrame, cols [, groupbycols];
+    df_transpose(df::AbstractDataFrame, cols [, gcols];
         id = nothing,
         renamecolid = (x -> "_c" * string(x)),
         renamerowid = identity,
         variable_name = "_variables_")
 
-transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `renamecolid` function to generate the new columns labels. The `renamerowid` function is applied to stringified names of `df[!, cols]` and attached them to the output as a new column with the label `variable_name`. When `groupbycols` is used the transposing is done within each group constructed by `groupbycols`. If the number of rows in a group is smaller than other groups, the extra columns in the output data frame is filled with `missing` (the default value can be changed by using `default_fill` argument) for that group.
+transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `renamecolid` function to generate the new columns labels. The `renamerowid` function is applied to stringified names of `df[!, cols]` and attached them to the output as a new column with the label `variable_name`. When `gcols` is used the transposing is done within each group constructed by `gcols`. If the number of rows in a group is smaller than other groups, the extra columns in the output data frame is filled with `missing` (the default value can be changed by using `default_fill` argument) for that group.
 
 * `renamecolid`: When `id` is not set, the argument to `renamecolid` must be an `Int`. And when `id` is set, the `renamecolid` will be applied to each row of `df[!, id]` as Tuple.
 * When `id` is set, `renamecolid` is defined as `x -> identity(string(values(x)))`
@@ -78,9 +78,9 @@ Row │ country  sex     pop_2000  pop_2010  pop_2020
   6 │ c3       female       190       200       203
 
 julia> df_transpose(pop, r"pop_", :country,
-                    id = :sex, variable_name = "year",
-                    renamerowid = x -> match(r"[0-9]+",x).match,
-                    renamecolid = x -> x * "_pop")
+                id = :sex, variable_name = "year",
+                renamerowid = x -> match(r"[0-9]+",x).match,
+                renamecolid = x -> x * "_pop")
 9×4 DataFrame
  Row │ country  year       male_pop  female_pop
      │ String   SubStrin…  Int64?    Int64?
@@ -116,7 +116,9 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex; 
         else
             ids_vals = df[!,id]
         end
-        @assert length(unique(ids_vals)) == nrow(df) "Duplicate ids are not allowed."
+        _ids_copy = deepcopy(ids_vals)
+
+        @assert length(unique!(_ids_copy)) == nrow(df) "Duplicate ids are not allowed."
         new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, ids_vals, names(ECol))
     end
 
@@ -134,86 +136,104 @@ function _obtain_maximum_groups_size(gridx, ngroups)
     maximum(levels)
 end
 
+# from DataFrames/reshape.jl
+function _find_group_row(gdf::GroupedDataFrame)
+    rows = zeros(Int, length(gdf))
+    isempty(rows) && return rows
+
+    filled = 0
+    i = 1
+    groups = gdf.groups
+    while filled < length(gdf)
+        group = groups[i]
+        if rows[group] == 0
+            rows[group] = i
+            filled += 1
+        end
+        i += 1
+    end
+    return rows
+end
+
 # gaining information about group info with out any assumption about the orders
-function update_group_info!(group_info, row_t, gridx, row_names, i)
-    n_row_names = length(row_names)
-    gid = gridx[i]
-    _rows_ = (gid-1)*n_row_names+1:(gid*n_row_names)
-    @views fill!(group_info[_rows_], row_t[i])
-end
+# function update_group_info!(group_info, row_t, gridx, row_names, i)
+#     n_row_names = length(row_names)
+#     gid = gridx[i]
+#     _rows_ = (gid-1)*n_row_names+1:(gid*n_row_names)
+#     @views fill!(group_info[_rows_], row_t[i])
+# end
 
-function update_outputmat!(outputmat, x, gridx, which_col, row_names, i)
-    n_row_names = length(row_names)
-    gid = gridx[i]
-    selected_col = which_col[gid]
+function update_outputmat!(outputmat, x, gridx, n_row_names, which_col)
     for j in 1:n_row_names
-        outputmat[(gid-1)*n_row_names+j, selected_col] = x[j][i]
+        fill!(which_col, 0)
+        for i in 1:length(gridx)
+            gid = gridx[i]
+            which_col[gid] += 1
+            selected_col = which_col[gid]
+            _row_ = (gid-1)*n_row_names+j
+            outputmat[selected_col][_row_] = x[j][i]
+        end
     end
 end
 
-function update_outputmat!(outputmat, x, gridx, ids, dict_cols::Dict, row_names, i, row_t, which_col)
-    n_row_names = length(row_names)
-    gid = gridx[i]
-    selected_col = dict_cols[ids[i]]
+
+function update_outputmat!(outputmat, x, gridx, ids, dict_cols::Dict, n_row_names, _is_cell_filled)
     for j in 1:n_row_names
-        outputmat[(gid-1)*n_row_names+j, selected_col] = x[j][i]
+        for i in 1:length(gridx)
+            gid = gridx[i]
+            selected_col = dict_cols[ids[i]]
+            _row_ = (gid-1)*n_row_names+j
+            if _is_cell_filled[_row_, selected_col]
+                throw(AssertionError("Duplicate id within a group is not allowd"))
+            else
+                outputmat[selected_col][_row_] = x[j][i]
+                _is_cell_filled[_row_, selected_col] = true
+            end
+        end
     end
 end
 
-function _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t; default_fill = missing)
+function _fill_outputmat_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names; default_fill = missing)
 
     @assert _check_allocation_limit(nonmissingtype(T), length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
     CT = promote_type(T, typeof(default_fill))
-    outputmat = fill!(Matrix{CT}(undef,length(row_names)*gdf.ngroups, length(new_col_names)),default_fill)
+    outputmat = [fill!(Vector{CT}(undef, length(row_names)*gdf.ngroups), default_fill) for _ in 1:length(new_col_names)]
+    which_col = Vector{Int}(undef, gdf.ngroups)
 
-    which_col = zeros(Int, gdf.ngroups)
+    update_outputmat!(outputmat, in_cols, gridx, length(row_names), which_col)
 
-    group_info = Vector{eltype(row_t)}(undef, gdf.ngroups*length(row_names))
-
-    for i in 1:length(gridx)
-        gid = gridx[i]
-        which_col[gid] += 1
-        if which_col[gid] == 1
-            update_group_info!(group_info, row_t, gridx, row_names, i)
-        end
-        update_outputmat!(outputmat, in_cols, gridx, which_col, row_names, i)
-    end
-    (group_info, outputmat)
+    outputmat
 end
 
-function _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids, new_col_names, row_names, dict_cols, row_t; default_fill = missing)
+function _fill_outputmat_withid(T, in_cols, gdf, gridx, ids, new_col_names, row_names, dict_cols; default_fill = missing)
 
     @assert _check_allocation_limit(nonmissingtype(T), length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
     CT = promote_type(T, typeof(default_fill))
-    outputmat = fill!(Matrix{CT}(undef,length(row_names)*gdf.ngroups, length(new_col_names)), default_fill)
+    outputmat = [fill!(Vector{CT}(undef, length(row_names)*gdf.ngroups), default_fill) for _ in 1:length(new_col_names)]
+
+    _is_cell_filled = falses(length(row_names)*gdf.ngroups, length(new_col_names))
 
     which_col = zeros(Int, gdf.ngroups)
 
-    group_info = Vector{eltype(row_t)}(undef, gdf.ngroups*length(row_names))
+    update_outputmat!(outputmat, in_cols, gridx, ids, dict_cols, length(row_names), _is_cell_filled)
 
-    for i in 1:length(gridx)
-        gid = gridx[i]
-        which_col[gid] += 1
-        if which_col[gid] == 1
-            update_group_info!(group_info, row_t, gridx, row_names, i)
-        end
-        update_outputmat!(outputmat, in_cols, gridx, ids, dict_cols, row_names, i, row_t, which_col)
-    end
-    (group_info, outputmat)
+    outputmat
 end
 
 function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, gcols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_", default_fill = missing)
     ECol = eachcol(df[!,cols])
     EColG = eachcol(df[!,gcols])
     T = mapreduce(eltype, promote_type, ECol)
-    row_t = Tables.rowtable(EColG)
 
     in_cols = Vector{T}[x for x in ECol]
 
     gdf = groupby(df, gcols)
+
+    rows_with_group_info = _find_group_row(gdf)
+
     gridx = gdf.groups
 
-    # stack can be done fast
+    # stack can be done fast also a fast path can be selected for unstack
     # fast_stack = false
     # if gdf.ngroups == nrow(df)
     #     # we are doing a stack
@@ -232,7 +252,7 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
 
         new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, 1:out_ncol, names(ECol))
 
-        group_info, outputmat = _fill_outputmat_and_group_info_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names, row_t; default_fill = default_fill)
+        outputmat = _fill_outputmat_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names; default_fill = default_fill)
     else
         if renamecolid === nothing
             renamecolid = _default_renamecolid_function_withid
@@ -245,23 +265,20 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
             ids_vals = df[!,id]
         end
 
-        grv_plus_idv = union(names(df,gcols),names(df,id))
-        check_unique_ids_within_groups = combine(groupby(df, grv_plus_idv), 1=>length=>:__length_id_within_groups__)
-        @assert all(isequal(1), check_unique_ids_within_groups.__length_id_within_groups__) "Duplicate id within a group is not allowed."
-
         unique_ids = unique(ids_vals)
         out_ncol = length(unique_ids)
 
         new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, unique_ids, names(ECol))
 
         dict_out_col = Dict(unique_ids .=> 1:out_ncol)
-        group_info, outputmat = _fill_outputmat_and_group_info_withid(T, in_cols, gdf, gridx, ids_vals, new_col_names, row_names, dict_out_col, row_t; default_fill = default_fill)
+        outputmat = _fill_outputmat_withid(T, in_cols, gdf, gridx, ids_vals, new_col_names, row_names, dict_out_col; default_fill = default_fill)
     end
 
     new_var_label = Symbol(variable_name)
 
-    df1 = insertcols!(DataFrame(outputmat, new_col_names),1, new_var_label => repeat(row_names, outer = gdf.ngroups))
-    DataFrames.hcat!(DataFrame(group_info),df1)
+    outdf = DataFrame(outputmat, new_col_names, copycols = false)
+    insertcols!(outdf, 1, new_var_label => repeat(row_names, outer = gdf.ngroups), copycols = false)
+    DataFrames.hcat(repeat(df[rows_with_group_info,gcols], inner = length(row_names)), outdf, copycols = false)
 
 end
 
