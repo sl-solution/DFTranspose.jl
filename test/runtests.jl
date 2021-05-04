@@ -285,10 +285,10 @@ end
 
     udf = df_transpose(df, [:value], [:id], id = :variable)
     @test isa(udf[!, 1], CategoricalVector{Int})
-    @test isa(udf[!, :a], CategoricalVector{Union{Int,Missing}})
-    @test isa(udf[!, :b], CategoricalVector{Union{Int,Missing}})
-    @test isa(udf[!, :c], CategoricalVector{Union{Int,Missing}})
-    @test isa(udf[!, :d], CategoricalVector{Union{Int,Missing}})
+    @test isa(udf[!, :a], Vector{Union{Missing, CategoricalValue{Int64, UInt32}}})
+    @test isa(udf[!, :b], Vector{Union{Missing, CategoricalValue{Int64, UInt32}}})
+    @test isa(udf[!, :c], Vector{Union{Missing, CategoricalValue{Int64, UInt32}}})
+    @test isa(udf[!, :d], Vector{Union{Missing, CategoricalValue{Int64, UInt32}}})
 
 
     df1 = DataFrame(a=["x", "y"], b=rand(2), c=[1, 2], d=rand(Bool, 2))
