@@ -225,9 +225,9 @@ end
     levels!(df[!, 2], ["YYY", "Color", "Mass"])
     df2 = df_transpose(df, [:Value], [:Fish], id = :Key, renamecolid=x->string("_", uppercase(string(x)), "_"))
     df4 = DataFrame(Fish = Union{String, Missing}["Bob", "Batman"],
-                    _variables_ = String["Value", "Value"],
-                    _MASS_ = Union{String, Missing}["12 g", "18 g"],
-                    _COLOR_ = Union{String, Missing}["Red", "Grey"])
+                _variables_ = String["Value", "Value"],
+                _COLOR_ = Union{String, Missing}["Red", "Grey"],
+                _MASS_ = Union{String, Missing}["12 g", "18 g"])
     @test df2 == df4
     # without categorical array
     df = DataFrame(Fish = ["Bob", "Bob", "Batman", "Batman"],

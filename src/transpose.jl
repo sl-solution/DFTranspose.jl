@@ -30,6 +30,12 @@ function _simple_transpose_df_generate(T, in_cols, row_names, new_col_names, var
     insertcols!(DataFrame(outputmat, new_col_names), 1,  new_var_label => row_names)
 end
 
+function _find_unique_values(df, cols)
+    gdf = groupby(df, cols)
+    _unique_rows = _find_group_row(gdf)
+    view(df, _unique_rows, cols)
+end
+
 """
     df_transpose(df::AbstractDataFrame, cols [, gcols];
         id = nothing,
@@ -116,9 +122,9 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex; 
         else
             ids_vals = df[!,id]
         end
-        _ids_copy = deepcopy(ids_vals)
+        ids_unique_vals = _find_unique_values(df, id)
 
-        @assert length(unique!(_ids_copy)) == nrow(df) "Duplicate ids are not allowed."
+        @assert (length(ids_unique_vals)) == nrow(df) "Duplicate ids are not allowed."
         new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, ids_vals, names(ECol))
     end
 
@@ -261,11 +267,12 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
 
         if size(df[!,id],2) > 1
             ids_vals = Tables.rowtable(df[!,id])
+            unique_ids = Tables.rowtable(_find_unique_values(df, id))
         else
             ids_vals = df[!,id]
+            unique_ids = _find_unique_values(df, id)
         end
 
-        unique_ids = unique(ids_vals)
         out_ncol = length(unique_ids)
 
         new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, unique_ids, names(ECol))
