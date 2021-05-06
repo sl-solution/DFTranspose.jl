@@ -284,7 +284,7 @@ end
                        [:id, :variable, :value])
 
     udf = df_transpose(df, [:value], [:id], id = :variable)
-    @test isa(udf[!, 1], CategoricalVector{Int})
+    @test isa(udf[!, 1], Vector{CategoricalValue{Int64, UInt32}})
     @test isa(udf[!, :a], Vector{Union{Missing, CategoricalValue{Int64, UInt32}}})
     @test isa(udf[!, :b], Vector{Union{Missing, CategoricalValue{Int64, UInt32}}})
     @test isa(udf[!, :c], Vector{Union{Missing, CategoricalValue{Int64, UInt32}}})
