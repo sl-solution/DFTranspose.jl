@@ -200,7 +200,7 @@ julia> df_transpose(df, Not(:person), :person,
                            renamecolid = x -> "measurement")
    9×3 DataFrame
  Row │ person   Date        measurement
-     │ Float64  Date        Float64?    
+     │ Float64  Date        Float64    
 ─────┼──────────────────────────────────
    1 │     1.0  2020-11-01          1.1
    2 │     1.0  2020-12-01          1.1
@@ -410,7 +410,7 @@ julia> df_transpose(df, [:c, :d], Not([:c, :d]),
                      renamecolid = x -> "value")
 12×5 DataFrame
  Row │ a      b      e       variable  value
-     │ Int64  Int64  String  String    Int64?
+     │ Int64  Int64  String  String    Int64
 ─────┼────────────────────────────────────────
    1 │     1      1  a       c              1
    2 │     1      1  a       d              1
@@ -429,7 +429,7 @@ julia> insertcols!(df, 1, :RowID => 1:nrow(df))
 julia> df_transpose(df, [:c, :d], [:RowID, :a])
 12×4 DataFrame
  Row │ RowID  a      _variables_  _c1
-     │ Int64  Int64  String       Int64?
+     │ Int64  Int64  String       Int64
 ─────┼───────────────────────────────────
    1 │     1      1  c                 1
    2 │     1      1  d                 1
@@ -474,7 +474,7 @@ julia> long = df_transpose(wide, 3:5, [:id, :a],
                            renamecolid = x->"value")
 18×4 DataFrame
  Row │ id     a      variable  value    
-     │ Int64  Int64  String    Float64?
+     │ Int64  Int64  String    Float64
 ─────┼──────────────────────────────────
    1 │     1      1  b              1.0
    2 │     1      1  c              1.0
