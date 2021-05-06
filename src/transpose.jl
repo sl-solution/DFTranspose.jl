@@ -27,7 +27,7 @@ function _simple_transpose_df_generate(T, in_cols, row_names, new_col_names, var
     _simple_df_transpose!(outputmat, in_cols)
 
     new_var_label = Symbol(variable_name)
-    insertcols!(DataFrame(outputmat, new_col_names), 1,  new_var_label => row_names)
+    insertcols!(DataFrame(outputmat, new_col_names), 1,  new_var_label => row_names, copycols = false)
 end
 
 function _find_unique_values(df, cols)
@@ -134,6 +134,61 @@ end
 
 
 # groupby case
+function _fill_onecol!(y, x, ntimes)
+    for i in 1:length(x)
+        @views fill!(y[(i-1)*ntimes+1:(i*ntimes)], x[i])
+    end
+end
+
+function _fill_row_names!(res, row_names, ntimes)
+    n = length(row_names)
+    for i in 1:ntimes
+        @views copy!(res[(i-1)*n+1:i*n], row_names)
+    end
+    res
+end
+
+function _fill_gcol!(res, df, gcolindex, colsidx)
+
+    ntimes = length(colsidx)
+    totalrow = nrow(df) * ntimes
+    g_eltype = eltype.(eachcol(df[!,gcolindex]))
+    for i in 1:length(gcolindex)
+        push!(res, Vector{g_eltype[i]}(undef, totalrow))
+        _fill_onecol!(res[i], df[!, gcolindex[i]], ntimes)
+    end
+    res
+end
+
+function _fill_col_val!(res, in_cols, ntimes, df_n_row)
+    for j in 1:ntimes
+        for i in 1:df_n_row
+            res[(i-1)*ntimes+j] = in_cols[j][i]
+        end
+    end
+end
+
+
+function fast_stack(T, df, in_cols, colsidx, gcolsidx, colid, row_names, variable_name)
+    # construct group columns
+    g_array = AbstractArray[]
+    _fill_gcol!(g_array, df, gcolsidx, colsidx)
+    df1 = DataFrame(g_array, DataFrames._names(df)[gcolsidx], copycols = false)
+
+    # construct variable names column
+    _repeat_row_names = Vector{eltype(row_names)}(undef, nrow(df)*length(colsidx))
+    _fill_row_names!(_repeat_row_names, row_names, nrow(df))
+    new_var_label = Symbol(variable_name)
+    insertcols!(df1, new_var_label => _repeat_row_names, copycols = false)
+
+    # fill the stacked column
+    res = Vector{T}(undef, nrow(df)*length(colsidx))
+    _fill_col_val!(res, in_cols, length(colsidx), nrow(df))
+    new_col_id = Symbol(colid)
+    insertcols!(df1, new_col_id => res, copycols = false)
+end
+
+
 function _obtain_maximum_groups_size(gridx, ngroups)
     levels = zeros(Int32, ngroups)
     @simd for i in 1:length(gridx)
@@ -184,10 +239,10 @@ end
 
 
 function update_outputmat!(outputmat, x, gridx, ids, dict_cols::Dict, n_row_names, _is_cell_filled)
-    for j in 1:n_row_names
-        for i in 1:length(gridx)
-            gid = gridx[i]
-            selected_col = dict_cols[ids[i]]
+    for i in 1:length(gridx)
+        gid = gridx[i]
+        selected_col = dict_cols[ids[i]]
+        for j in 1:n_row_names
             _row_ = (gid-1)*n_row_names+j
             if _is_cell_filled[_row_, selected_col]
                 throw(AssertionError("Duplicate id within a group is not allowed"))
@@ -227,36 +282,35 @@ function _fill_outputmat_withid(T, in_cols, gdf, gridx, ids, new_col_names, row_
 end
 
 function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, gcols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_", default_fill = missing)
-    ECol = eachcol(df[!,cols])
-    EColG = eachcol(df[!,gcols])
+    colsidx = DataFrames.index(df)[cols]
+    gcolsidx = DataFrames.index(df)[gcols]
+
+    ECol = eachcol(df[!,colsidx])
+
     T = mapreduce(eltype, promote_type, ECol)
 
     in_cols = Vector{T}[x for x in ECol]
 
     gdf = groupby(df, gcols)
-
-    rows_with_group_info = _find_group_row(gdf)
-
     gridx = gdf.groups
 
-    # stack can be done fast also a fast path can be selected for unstack
-    # fast_stack = false
-    # if gdf.ngroups == nrow(df)
-    #     # we are doing a stack
-    #     if nonmissingtype(T) <: Number
-    #         # we can use faster approach or implement view option
-    #         fast_stack = true
-    #     end
-    # end
+    need_fast_stack = false
+    if gdf.ngroups == nrow(df)
+        need_fast_stack = true
+    end
 
     if id === nothing
         if renamecolid === nothing
             renamecolid = _default_renamecolid_function_withoutid
         end
+        # fast_stack path, while keeping the row order consistent
+        if need_fast_stack
+            return fast_stack(T, df, in_cols, colsidx, gcolsidx, renamecolid(1), renamerowid.(names(df, colsidx)), variable_name)
+        end
 
         out_ncol = _obtain_maximum_groups_size(gridx, gdf.ngroups)
 
-        new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, 1:out_ncol, names(ECol))
+        new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, 1:out_ncol, names(df)[colsidx])
 
         outputmat = _fill_outputmat_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names; default_fill = default_fill)
     else
@@ -275,17 +329,21 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
 
         out_ncol = length(unique_ids)
 
-        new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, unique_ids, names(ECol))
+        new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, unique_ids, names(df)[colsidx])
 
         dict_out_col = Dict(unique_ids .=> 1:out_ncol)
         outputmat = _fill_outputmat_withid(T, in_cols, gdf, gridx, ids_vals, new_col_names, row_names, dict_out_col; default_fill = default_fill)
     end
-
+    rows_with_group_info = _find_group_row(gdf)
     new_var_label = Symbol(variable_name)
 
     outdf = DataFrame(outputmat, new_col_names, copycols = false)
-    insertcols!(outdf, 1, new_var_label => repeat(row_names, outer = gdf.ngroups), copycols = false)
-    DataFrames.hcat(repeat(df[rows_with_group_info,gcols], inner = length(row_names)), outdf, copycols = false)
+    _repeat_row_names = Vector{eltype(row_names)}(undef, gdf.ngroups*length(colsidx))
+    _fill_row_names!(_repeat_row_names, row_names, gdf.ngroups)
+    insertcols!(outdf, 1, new_var_label => _repeat_row_names, copycols = false)
+    g_array = AbstractArray[]
+    _fill_gcol!(g_array, view(df, rows_with_group_info, :), gcolsidx, colsidx)
+    hcat(DataFrame(g_array, DataFrames._names(df)[gcolsidx], copycols = false), outdf, copycols = false)
 
 end
 
