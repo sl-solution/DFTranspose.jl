@@ -1,7 +1,7 @@
 using DFTranspose
 using Test
 
-using Test, DataFrames, Random, CategoricalArrays, Dates
+using Test, DataFrames, Random, CategoricalArrays, Dates, PooledArrays
 const ≅ = isequal
 @testset "general usage" begin
 
@@ -134,7 +134,13 @@ const ≅ = isequal
             [:country,:year,:male_pop,:female_pop])
 
     @test popt == poptm
-
+    popt = df_transpose(pop, r"pop", r"cou", id = r"sex",  variable_name = "year",
+                            renamerowid = x -> match(r"[0-9]+",x).match, renamecolid = x -> x * "_pop")
+    @test popt == poptm
+    pop.country = PooledArray(pop.country)
+    popt = df_transpose(pop, r"pop", r"cou", id = r"sex",  variable_name = "year",
+                            renamerowid = x -> match(r"[0-9]+",x).match, renamecolid = x -> x * "_pop")
+    @test popt.country == PooledArray(["c1", "c1", "c1", "c2", "c2", "c2", "c3", "c3", "c3"])
     df =  DataFrame(region = repeat(["North","North","South","South"],2),
                  fuel_type = repeat(["gas","coal"],4),
                  load = [.1,.2,.5,.1,6.,4.3,.1,6.],
