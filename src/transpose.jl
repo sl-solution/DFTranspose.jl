@@ -124,7 +124,7 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex; 
         end
         ids_unique_vals = _find_unique_values(df, id)
 
-        @assert (length(ids_unique_vals)) == nrow(df) "Duplicate ids are not allowed."
+        @assert (size(ids_unique_vals,1)) == nrow(df) "Duplicate ids are not allowed."
         new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, ids_vals, names(ECol))
     end
 
