@@ -33,7 +33,7 @@ end
 function _find_unique_values(df, cols)
     gdf = groupby(df, cols)
     _unique_rows = _find_group_row(gdf)
-    view(df, _unique_rows, cols)
+    df[_unique_rows, cols]
 end
 
 """
@@ -114,15 +114,17 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex; 
         end
         new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, 1:nrow(df), names(ECol))
     else
+        ididx = DataFrames.index(df)[id]
+        length(ididx) == 1 ? ididx = ididx[1] : nothing
         if renamecolid === nothing
             renamecolid = _default_renamecolid_function_withid
         end
-        if size(df[!,id],2) > 1
-            ids_vals = Tables.rowtable(df[!,id])
+        if size(df[!,ididx],2) > 1
+            ids_vals = Tables.rowtable(df[!,ididx])
         else
-            ids_vals = df[!,id]
+            ids_vals = df[!,ididx]
         end
-        ids_unique_vals = _find_unique_values(df, id)
+        ids_unique_vals = _find_unique_values(df, ididx)
 
         @assert (size(ids_unique_vals,1)) == nrow(df) "Duplicate ids are not allowed."
         new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, ids_vals, names(ECol))
@@ -152,10 +154,10 @@ function _fill_gcol!(res, df, gcolindex, colsidx)
 
     ntimes = length(colsidx)
     totalrow = nrow(df) * ntimes
-    g_eltype = eltype.(eachcol(df[!,gcolindex]))
     for i in 1:length(gcolindex)
-        push!(res, Vector{g_eltype[i]}(undef, totalrow))
-        _fill_onecol!(res[i], df[!, gcolindex[i]], ntimes)
+        _temp = df[!,gcolindex[i]]
+        push!(res, similar(_temp, totalrow))
+        _fill_onecol!(res[i], _temp, ntimes)
     end
     res
 end
@@ -314,17 +316,19 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
 
         outputmat = _fill_outputmat_withoutid(T, in_cols, gdf, gridx, new_col_names, row_names; default_fill = default_fill)
     else
+        ididx = DataFrames.index(df)[id]
+        length(ididx) == 1 ? ididx = ididx[1] : nothing
         if renamecolid === nothing
             renamecolid = _default_renamecolid_function_withid
         end
         # we assume the unique function keep the same order as original data, which is the case sofar
 
-        if size(df[!,id],2) > 1
-            ids_vals = Tables.rowtable(df[!,id])
-            unique_ids = Tables.rowtable(_find_unique_values(df, id))
+        if size(df[!,ididx],2) > 1
+            ids_vals = Tables.rowtable(df[!,ididx])
+            unique_ids = Tables.rowtable(_find_unique_values(df, ididx))
         else
-            ids_vals = df[!,id]
-            unique_ids = _find_unique_values(df, id)
+            ids_vals = df[!,ididx]
+            unique_ids = _find_unique_values(df, ididx)
         end
 
         out_ncol = length(unique_ids)
@@ -337,13 +341,16 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex, 
     rows_with_group_info = _find_group_row(gdf)
     new_var_label = Symbol(variable_name)
 
-    outdf = DataFrame(outputmat, new_col_names, copycols = false)
-    _repeat_row_names = Vector{eltype(row_names)}(undef, gdf.ngroups*length(colsidx))
-    _fill_row_names!(_repeat_row_names, row_names, gdf.ngroups)
-    insertcols!(outdf, 1, new_var_label => _repeat_row_names, copycols = false)
     g_array = AbstractArray[]
     _fill_gcol!(g_array, view(df, rows_with_group_info, :), gcolsidx, colsidx)
-    hcat(DataFrame(g_array, DataFrames._names(df)[gcolsidx], copycols = false), outdf, copycols = false)
+    outdf = DataFrame(g_array, DataFrames._names(df)[gcolsidx], copycols = false)
+    _repeat_row_names = Vector{eltype(row_names)}(undef, gdf.ngroups*length(colsidx))
+    _fill_row_names!(_repeat_row_names, row_names, gdf.ngroups)
+    insertcols!(outdf, new_var_label => _repeat_row_names, copycols = false)
+
+    hcat(outdf, DataFrame(outputmat, new_col_names, copycols = false), copycols = false)
+
+
 
 end
 
