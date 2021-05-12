@@ -6,11 +6,8 @@ _default_renamecolid_function_withoutid(x) = "_c" * string(x)
 _default_renamecolid_function_withid(x) = identity(string(values(x)))
 _default_renamerowid_function(x) = identity(x)
 # handling simplest case
-function _simple_df_transpose!(outx, inx)
-    n = size(outx,2)
-    for i in 1:size(outx,1)
-            @views copy!(outx[i,1:n], inx[i])
-    end
+function _simple_df_transpose!(outx, inx, i)
+    @views copy!(outx[i,:], inx)
 end
 
 function _generate_col_row_names(renamecolid, renamerowid, ids, dfnames)
@@ -24,7 +21,9 @@ end
 function _simple_transpose_df_generate(T, in_cols, row_names, new_col_names, variable_name)
     outputmat = Matrix{T}(undef,length(row_names), length(new_col_names))
 
-    _simple_df_transpose!(outputmat, in_cols)
+    for i in 1:length(in_cols)
+        _simple_df_transpose!(outputmat, in_cols[i], i)
+    end
 
     new_var_label = Symbol(variable_name)
     insertcols!(DataFrame(outputmat, new_col_names), 1,  new_var_label => row_names, copycols = false)
@@ -104,15 +103,16 @@ julia> df_transpose(pop, r"pop_", :country,
 ```
 """
 function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex; id = nothing, renamecolid = nothing, renamerowid = _default_renamerowid_function, variable_name = "_variables_")
-    ECol = eachcol(df[!,cols])
+    colidx = DataFrames.index(df)[cols]
+    ECol = view(getfield(df, :columns), colidx)
     T = mapreduce(eltype, promote_type, ECol)
-    in_cols = Vector{T}[x for x in ECol]
+    # in_cols = [x for x in ECol]
 
     if id === nothing
         if renamecolid === nothing
             renamecolid = _default_renamecolid_function_withoutid
         end
-        new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, 1:nrow(df), names(ECol))
+        new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, 1:nrow(df), names(df)[colidx])
     else
         ididx = DataFrames.index(df)[id]
         length(ididx) == 1 ? ididx = ididx[1] : nothing
@@ -127,10 +127,10 @@ function df_transpose(df::AbstractDataFrame, cols::DataFrames.MultiColumnIndex; 
         ids_unique_vals = _find_unique_values(df, ididx)
 
         @assert (size(ids_unique_vals,1)) == nrow(df) "Duplicate ids are not allowed."
-        new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, ids_vals, names(ECol))
+        new_col_names, row_names = _generate_col_row_names(renamecolid, renamerowid, ids_vals, names(df)[colidx])
     end
 
-    _simple_transpose_df_generate(T, in_cols, row_names, new_col_names, variable_name)
+    _simple_transpose_df_generate(T, ECol, row_names, new_col_names, variable_name)
 
 end
 
