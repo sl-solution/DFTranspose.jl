@@ -227,18 +227,16 @@ end
 # end
 
 function update_outputmat!(outputmat, x, gridx, n_row_names, which_col)
-    for j in 1:n_row_names
-        fill!(which_col, 0)
-        for i in 1:length(gridx)
-            gid = gridx[i]
-            which_col[gid] += 1
-            selected_col = which_col[gid]
+    for i in 1:length(gridx)
+        gid = gridx[i]
+        which_col[gid] += 1
+        selected_col = which_col[gid]
+        for j in 1:n_row_names
             _row_ = (gid-1)*n_row_names+j
             outputmat[selected_col][_row_] = x[j][i]
         end
     end
 end
-
 
 function update_outputmat!(outputmat, x, gridx, ids, dict_cols::Dict, n_row_names, _is_cell_filled)
     for i in 1:length(gridx)
@@ -261,7 +259,7 @@ function _fill_outputmat_withoutid(T, in_cols, gdf, gridx, new_col_names, row_na
     @assert _check_allocation_limit(nonmissingtype(T), length(row_names)*gdf.ngroups, length(new_col_names)) < 1.0 "The output data frame is huge and there is not enough resource to allocate it."
     CT = promote_type(T, typeof(default_fill))
     outputmat = [fill!(Vector{CT}(undef, length(row_names)*gdf.ngroups), default_fill) for _ in 1:length(new_col_names)]
-    which_col = Vector{Int}(undef, gdf.ngroups)
+    which_col = zeros(Int, gdf.ngroups)
 
     update_outputmat!(outputmat, in_cols, gridx, length(row_names), which_col)
 
