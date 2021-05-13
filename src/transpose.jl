@@ -42,7 +42,7 @@ end
         renamerowid = identity,
         variable_name = "_variables_")
 
-transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `renamecolid` function to generate the new columns labels. The `renamerowid` function is applied to stringified names of `df[!, cols]` and attached them to the output as a new column with the label `variable_name`. When `gcols` is used the transposing is done within each group constructed by `gcols`. If the number of rows in a group is smaller than other groups, the extra columns in the output data frame is filled with `missing` (the default value can be changed by using `default_fill` argument) for that group.
+transposes `df[!, cols]`. When `id` is set, the values of `df[!, id]` will be used to label the columns in the new data frame. The function uses the `renamecolid` function to generate the new columns labels. The `renamerowid` function is applied to stringified names of `df[!, cols]` and these are attached to the output as a new column with the label `variable_name`. When `gcols` is used the transposing is done within each group constructed by `gcols`. If the number of rows in a group is smaller than other groups, the extra columns in the output data frame is filled with `missing` (the default value can be changed by using `default_fill` argument) for that group.
 
 * `renamecolid`: When `id` is not set, the argument to `renamecolid` must be an `Int`. And when `id` is set, the `renamecolid` will be applied to each row of `df[!, id]` as Tuple.
 * When `id` is set, `renamecolid` is defined as `x -> identity(string(values(x)))`
