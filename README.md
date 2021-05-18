@@ -352,7 +352,7 @@ julia> df1 = DataFrame(a=["x", "y"], b=[1.0, 2.0], c=[3, 4], d=[true, false])
    1 │ x           1.0      3   true
    2 │ y           2.0      4  false
 
-julia> t_function(df, [:b, :c, :d], id = :a) # note the column types
+julia> df_transpose(df, [:b, :c, :d], id = :a) # note the column types
 3×3 DataFrame
  Row │ _variables_  x        y
      │ String       Float64  Float64
