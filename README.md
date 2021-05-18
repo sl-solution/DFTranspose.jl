@@ -167,11 +167,14 @@ julia> pop = DataFrame(country = ["c1","c1","c2","c2","c3","c3"],
    5 │ c3       male         170       178       180
    6 │ c3       female       190       200       203
 
-julia> df_transpose(pop, r"pop_", :country, id = :sex, variable_name = "year",
-                renamerowid = x -> match(r"[0-9]+",x).match, renamecolid = x -> x * "_pop")
+julia> df_transpose(pop, r"pop_", :country,
+                      id = :sex, 
+                      variable_name = "year",
+                      renamerowid = x -> replace(x, "pop_"=>""),
+                      renamecolid = x -> x * "_pop")
 9×4 DataFrame
   Row │ country  year       male_pop  female_pop
-      │ String   SubStrin…  Int64?    Int64?     
+      │ String   String         Int64?    Int64?     
  ─────┼──────────────────────────────────────────
     1 │ c1       2000            100         120
     2 │ c1       2010            110         120
