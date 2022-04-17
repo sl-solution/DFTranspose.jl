@@ -1,3 +1,7 @@
+All functionalities of this repository plus more features has been implemented in a new package called [InMemoryDatasets.jl](https://github.com/sl-solution/InMemoryDatasets.jl)
+===
+
+
 # DFTranspose.jl
 
 `DFTranspose.jl` is a `Julia` package to explore the implementation of a new function for reshaping `DataFrame`s.
